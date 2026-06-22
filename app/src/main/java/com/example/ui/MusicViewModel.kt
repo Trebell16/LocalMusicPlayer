@@ -46,6 +46,19 @@ class MusicViewModel(
     val playlistsWithSongs: StateFlow<List<PlaylistWithSongs>> = repository.playlistsWithSongsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val recentlyPlayed: StateFlow<List<Song>> = repository.recentlyPlayedFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    init {
+        viewModelScope.launch {
+            playbackManager.currentSong.collectLatest { song ->
+                if (song != null) {
+                    repository.addSongToRecentlyPlayed(song)
+                }
+            }
+        }
+    }
+
     // Player State Bindings
     val currentSong: StateFlow<Song?> = playbackManager.currentSong
     val isPlaying: StateFlow<Boolean> = playbackManager.isPlaying
@@ -54,6 +67,12 @@ class MusicViewModel(
     val loopMode: StateFlow<LoopMode> = playbackManager.loopMode
     val isShuffle: StateFlow<Boolean> = playbackManager.isShuffle
     val audioSessionId: StateFlow<Int?> = playbackManager.audioSessionId
+    val equalizerManager = playbackManager.equalizerManager
+    val playbackSpeed: StateFlow<Float> = playbackManager.playbackSpeed
+
+    fun setPlaybackSpeed(speed: Float) {
+        playbackManager.setPlaybackSpeed(speed)
+    }
 
     // Filtered and sorted lists of songs based on search query and sort order
     val filteredSongs: StateFlow<List<Song>> = combine(
@@ -198,6 +217,56 @@ class MusicViewModel(
             _songs.value = updatedSongs
             _folders.value = repository.groupSongsByFolder(updatedSongs)
         }
+    }
+
+    private var sleepTimerJob: kotlinx.coroutines.Job? = null
+    private val _sleepTimerRemaining = MutableStateFlow<Long?>(null) // in seconds
+    val sleepTimerRemaining: StateFlow<Long?> = _sleepTimerRemaining.asStateFlow()
+
+    fun startSleepTimer(minutes: Int) {
+        sleepTimerJob?.cancel()
+        if (minutes <= 0) {
+            _sleepTimerRemaining.value = null
+            return
+        }
+        val totalSeconds = minutes * 60L
+        _sleepTimerRemaining.value = totalSeconds
+        
+        sleepTimerJob = viewModelScope.launch {
+            var remaining = totalSeconds
+            while (remaining > 0) {
+                kotlinx.coroutines.delay(1000)
+                remaining--
+                _sleepTimerRemaining.value = remaining
+            }
+            playbackManager.pause()
+            _sleepTimerRemaining.value = null
+        }
+    }
+
+    fun startSleepTimerWithSeconds(seconds: Long) {
+        sleepTimerJob?.cancel()
+        if (seconds <= 0) {
+            _sleepTimerRemaining.value = null
+            return
+        }
+        _sleepTimerRemaining.value = seconds
+        
+        sleepTimerJob = viewModelScope.launch {
+            var remaining = seconds
+            while (remaining > 0) {
+                kotlinx.coroutines.delay(1000)
+                remaining--
+                _sleepTimerRemaining.value = remaining
+            }
+            playbackManager.pause()
+            _sleepTimerRemaining.value = null
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        _sleepTimerRemaining.value = null
     }
 
     override fun onCleared() {

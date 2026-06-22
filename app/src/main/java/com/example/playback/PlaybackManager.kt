@@ -21,6 +21,35 @@ class PlaybackManager(private val context: Context) {
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    companion object {
+        @Volatile
+        var instance: PlaybackManager? = null
+    }
+
+    init {
+        instance = this
+        scope.launch {
+            kotlinx.coroutines.flow.combine(currentSong, isPlaying) { _, _ -> }.collect {
+                updateServiceNotification()
+            }
+        }
+    }
+
+    private fun updateServiceNotification() {
+        try {
+            val intent = android.content.Intent(context, com.example.playback.MediaPlaybackService::class.java).apply {
+                action = com.example.playback.MediaPlaybackService.ACTION_UPDATE_NOTIFICATION
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        } catch (e: Exception) {
+            Log.e("PlaybackManager", "Failed to start/update foreground service", e)
+        }
+    }
+
     private var currentPlayer: MediaPlayer? = null
     private var nextPlayer: MediaPlayer? = null
 
@@ -44,6 +73,32 @@ class PlaybackManager(private val context: Context) {
 
     private val _isShuffle = MutableStateFlow(false)
     val isShuffle: StateFlow<Boolean> = _isShuffle.asStateFlow()
+
+    val equalizerManager = AudioEqualizerManager(context)
+
+    private val speedSharedPrefs = context.getSharedPreferences("playback_settings", Context.MODE_PRIVATE)
+    private val _playbackSpeed = MutableStateFlow(speedSharedPrefs.getFloat("playback_speed", 1.0f))
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
+    fun setPlaybackSpeed(speed: Float) {
+        val clampedSpeed = speed.coerceIn(0.5f, 2.0f)
+        _playbackSpeed.value = clampedSpeed
+        speedSharedPrefs.edit().putFloat("playback_speed", clampedSpeed).apply()
+        applyPlaybackSpeed()
+    }
+
+    fun applyPlaybackSpeed() {
+        val player = currentPlayer ?: return
+        try {
+            val speed = _playbackSpeed.value
+            val params = android.media.PlaybackParams()
+            params.speed = speed
+            params.pitch = 1.0f
+            player.playbackParams = params
+        } catch (e: Exception) {
+            Log.e("PlaybackManager", "Error setting playback speed", e)
+        }
+    }
 
     private var originalQueue = listOf<Song>()
     private var currentQueue = listOf<Song>()
@@ -114,6 +169,14 @@ class PlaybackManager(private val context: Context) {
         }
     }
 
+    fun pause() {
+        val player = currentPlayer ?: return
+        if (player.isPlaying) {
+            player.pause()
+            _isPlaying.value = false
+        }
+    }
+
     fun seekTo(positionMs: Long) {
         currentPlayer?.seekTo(positionMs.toInt())
         _currentPosition.value = positionMs
@@ -160,6 +223,7 @@ class PlaybackManager(private val context: Context) {
             
             _duration.value = player.duration.toLong()
             _audioSessionId.value = player.audioSessionId
+            equalizerManager.onAudioSessionIdChanged(player.audioSessionId)
 
             // Configure single loop repeating inside MediaPlayer itself for efficiency
             player.isLooping = (_loopMode.value == LoopMode.LOOP_ONE)
@@ -168,6 +232,7 @@ class PlaybackManager(private val context: Context) {
                 onCurrentPlayerCompleted()
             }
 
+            applyPlaybackSpeed()
             player.start()
             _isPlaying.value = true
 
@@ -255,6 +320,7 @@ class PlaybackManager(private val context: Context) {
             _currentSong.value = activeSong
             _duration.value = promotedNextPlayer.duration.toLong()
             _audioSessionId.value = promotedNextPlayer.audioSessionId
+            equalizerManager.onAudioSessionIdChanged(promotedNextPlayer.audioSessionId)
             _currentPosition.value = 0L
             _isPlaying.value = true
 
@@ -263,6 +329,7 @@ class PlaybackManager(private val context: Context) {
                 onCurrentPlayerCompleted()
             }
 
+            applyPlaybackSpeed()
             // Realize next preloaded slot
             nextPlayer = null
             preloadNextSong()
@@ -312,10 +379,12 @@ class PlaybackManager(private val context: Context) {
         _currentPosition.value = 0L
         _duration.value = 0L
         _audioSessionId.value = null
+        equalizerManager.onAudioSessionIdChanged(null)
     }
 
     fun release() {
         stop()
+        equalizerManager.releaseEqualizer()
         progressJob?.cancel()
         scope.cancel()
     }

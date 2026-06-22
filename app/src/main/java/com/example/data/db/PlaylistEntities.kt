@@ -70,7 +70,38 @@ interface PlaylistDao {
     suspend fun deletePlaylistSongById(id: Int)
 }
 
-@Database(entities = [PlaylistEntity::class, PlaylistSongEntity::class], version = 1, exportSchema = false)
+@Entity(tableName = "recently_played")
+data class RecentlyPlayedEntity(
+    @PrimaryKey val songPath: String,
+    val id: Long,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val duration: Long,
+    val size: Long,
+    val folderName: String,
+    val folderPath: String,
+    val albumArtUri: String?,
+    val playedAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface RecentlyPlayedDao {
+    @Query("SELECT * FROM recently_played ORDER BY playedAt DESC LIMIT 10")
+    fun getRecentlyPlayed(): Flow<List<RecentlyPlayedEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRecentlyPlayed(entity: RecentlyPlayedEntity)
+
+    @Query("DELETE FROM recently_played WHERE songPath = :songPath")
+    suspend fun deleteRecentlyPlayed(songPath: String)
+
+    @Query("DELETE FROM recently_played")
+    suspend fun clearAll()
+}
+
+@Database(entities = [PlaylistEntity::class, PlaylistSongEntity::class, RecentlyPlayedEntity::class], version = 2, exportSchema = false)
 abstract class MusicDatabase : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
+    abstract fun recentlyPlayedDao(): RecentlyPlayedDao
 }

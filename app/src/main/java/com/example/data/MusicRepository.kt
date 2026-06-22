@@ -14,6 +14,7 @@ import com.example.data.db.PlaylistSongEntity
 import com.example.data.db.PlaylistWithSongs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -22,11 +23,48 @@ import kotlin.math.sin
 
 class MusicRepository(
     private val context: Context,
-    private val playlistDao: PlaylistDao
+    private val playlistDao: PlaylistDao,
+    private val recentlyPlayedDao: com.example.data.db.RecentlyPlayedDao
 ) {
 
     val playlistsFlow: Flow<List<PlaylistEntity>> = playlistDao.getAllPlaylists()
     val playlistsWithSongsFlow: Flow<List<PlaylistWithSongs>> = playlistDao.getAllPlaylistsWithSongs()
+    val recentlyPlayedFlow: Flow<List<Song>> = recentlyPlayedDao.getRecentlyPlayed().map { list ->
+        list.map { entity ->
+            Song(
+                id = entity.id,
+                absolutePath = entity.songPath,
+                title = entity.title,
+                artist = entity.artist,
+                album = entity.album,
+                duration = entity.duration,
+                size = entity.size,
+                folderName = entity.folderName,
+                folderPath = entity.folderPath,
+                albumArtUri = entity.albumArtUri?.let { Uri.parse(it) }
+            )
+        }
+    }
+
+    suspend fun addSongToRecentlyPlayed(song: Song) {
+        withContext(Dispatchers.IO) {
+            recentlyPlayedDao.insertRecentlyPlayed(
+                com.example.data.db.RecentlyPlayedEntity(
+                    songPath = song.absolutePath,
+                    id = song.id,
+                    title = song.title,
+                    artist = song.artist,
+                    album = song.album,
+                    duration = song.duration,
+                    size = song.size,
+                    folderName = song.folderName,
+                    folderPath = song.folderPath,
+                    albumArtUri = song.albumArtUri?.toString(),
+                    playedAt = System.currentTimeMillis()
+                )
+            )
+        }
+    }
 
     suspend fun getPlaylistWithSongs(playlistId: Int): Flow<PlaylistWithSongs?> {
         return playlistDao.getPlaylistWithSongs(playlistId)
@@ -109,10 +147,7 @@ class MusicRepository(
                         val folderName = parentFile?.name ?: "Root"
                         val folderPath = parentFile?.absolutePath ?: "/"
                         
-                        val albumArtUri = ContentUris.withAppendedId(
-                            Uri.parse("content://media/external/audio/albumart"),
-                            id
-                        )
+                        val albumArtUri = Uri.parse("content://com.example.provider.albumart?path=${Uri.encode(path)}")
 
                         songsList.add(
                             Song(
@@ -210,6 +245,7 @@ class MusicRepository(
                     }
                 }
 
+                val albumArtUri = Uri.parse("content://com.example.provider.albumart?path=${Uri.encode(file.absolutePath)}")
                 songsList.add(
                     Song(
                         id = file.hashCode().toLong(),
@@ -221,7 +257,7 @@ class MusicRepository(
                         size = file.length(),
                         folderName = folderName,
                         folderPath = folderPath,
-                        albumArtUri = null
+                        albumArtUri = albumArtUri
                     )
                 )
             }
