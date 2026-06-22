@@ -248,7 +248,7 @@ fun MainScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Text(
-                        text = "Local Music Player",
+                        text = "Trebell Player",
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,

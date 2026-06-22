@@ -1,5 +1,5 @@
 {
-  "name": "Local Music Player",
+  "name": "Trebell Player",
   "description": "An elegant offline music player featuring device folder scanning, gapless playback, custom visualizers, custom playlists, and dark theme support.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

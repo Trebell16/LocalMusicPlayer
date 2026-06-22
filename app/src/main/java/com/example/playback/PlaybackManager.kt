@@ -36,6 +36,17 @@ class PlaybackManager(private val context: Context) {
     }
 
     private fun updateServiceNotification() {
+        val song = currentSong.value
+        if (song == null) {
+            try {
+                val intent = android.content.Intent(context, com.example.playback.MediaPlaybackService::class.java)
+                context.stopService(intent)
+            } catch (e: Exception) {
+                // ignore
+            }
+            return
+        }
+
         try {
             val intent = android.content.Intent(context, com.example.playback.MediaPlaybackService::class.java).apply {
                 action = com.example.playback.MediaPlaybackService.ACTION_UPDATE_NOTIFICATION
