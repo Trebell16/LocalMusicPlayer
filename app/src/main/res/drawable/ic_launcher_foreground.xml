@@ -1,0 +1,42 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer glass disk highlight with subtle circle -->
+    <path
+        android:pathData="M 54,12 A 42,42 0 1,0 54,96 A 42,42 0 1,0 54,12 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#4000F0FF"
+        android:fillColor="#15FFFFFF" />
+
+    <!-- Sleek inner disc grooves (resembling a record) -->
+    <path
+        android:pathData="M 54,24 A 30,30 0 1,0 54,84 A 30,30 0 1,0 54,24 Z"
+        android:strokeWidth="1.0"
+        android:strokeColor="#2500F0FF" />
+    <path
+        android:pathData="M 54,34 A 20,20 0 1,0 54,74 A 20,20 0 1,0 54,34 Z"
+        android:strokeWidth="1.0"
+        android:strokeColor="#1500F0FF" />
+
+    <!-- Beautiful Glowing Neon Double Music Note shape with Gradient -->
+    <path
+        android:pathData="M 42,32 L 72,24 L 72,32 L 42,40 Z
+                  M 42,32 L 46,32 L 46,66 C 46,70.5 41.5,73 36,73 C 30.5,73 26,70.5 26,66 C 26,61.5 30.5,59 36,59 C 39.5,59 42,60.5 43.5,62 L 43.5,32 Z
+                  M 72,24 L 76,24 L 76,58 C 76,62.5 71.5,65 66,65 C 60.5,65 56,62.5 56,58 C 56,53.5 60.5,51 66,51 C 69.5,51 72,52.5 73.5,54 L 73.5,24 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="26"
+                android:startY="24"
+                android:endX="76"
+                android:endY="73">
+                <item android:color="#00F0FF" android:offset="0.0" />
+                <item android:color="#A000FF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>
