@@ -73,6 +73,9 @@ import com.example.ui.MusicViewModel
 import com.example.ui.MusicViewModelFactory
 import com.example.ui.SongSortOrder
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.AnimatedLiquidBackground
+import com.example.ui.theme.liquidGlassCard
+import com.example.ui.theme.liquidGlassClickable
 import java.io.File
 import kotlin.math.sin
 
@@ -198,105 +201,128 @@ fun MainScreen(
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
 
-    if (!hasPermission && songs.isEmpty()) {
-        // Permissions / Onboarding Splash screen
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp)
-                .statusBarsPadding()
-                .navigationBarsPadding(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Animated glass-disk-note placeholder logo
+    Box(modifier = Modifier.fillMaxSize()) {
+        AnimatedLiquidBackground(isDarkTheme = isDarkTheme)
+
+        if (!hasPermission && songs.isEmpty()) {
+            // Permissions / Onboarding Splash screen in a luxurious floating glass container
             Box(
                 modifier = Modifier
-                    .size(140.dp)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.secondary
-                            )
-                        ),
-                        shape = CircleShape
-                    ),
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Logo",
-                    tint = Color.White,
-                    modifier = Modifier.size(64.dp)
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .liquidGlassCard(cornerRadius = 28.dp, isDarkTheme = isDarkTheme)
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    // Animated glass-disk-note placeholder logo with glowing liquid circle
+                    Box(
+                        modifier = Modifier
+                            .size(110.dp)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        Color(0xFF8B5CF6),
+                                        Color(0xFF06B6D4)
+                                    )
+                                ),
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "Logo",
+                            tint = Color.White,
+                            modifier = Modifier.size(54.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Text(
+                        text = "Local Music Player",
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "An offline audiophile experience. Scan your device's audio files, catalog in folder views, and manage custom playlists.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // Liquid Glass CTA Button
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .liquidGlassCard(cornerRadius = 16.dp, isDarkTheme = isDarkTheme)
+                            .liquidGlassClickable { launcher.launch(permissionsToRequest) }
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(
+                                        Color(0xFF8B5CF6).copy(alpha = 0.5f),
+                                        Color(0xFF06B6D4).copy(alpha = 0.5f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Scan Storage Files",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Sandbox/Emulator fallback track synthesizer generator in liquid glass
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .liquidGlassCard(cornerRadius = 16.dp, isDarkTheme = isDarkTheme)
+                            .liquidGlassClickable { viewModel.makeSampleTracks() }
+                            .background(Color.White.copy(alpha = 0.05f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Generate Virtual Songs",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Ideal for virtual emulators lacking audio files",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                text = "Local Music Player",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "An offline audiophile experience. Scan your device's audio files, catalog in folder views, and manage custom playlists.",
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            Button(
-                onClick = { launcher.launch(permissionsToRequest) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .testTag("grant_permission_button")
-            ) {
-                Text("Scan Storage Files", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Sandbox/Emulator fallback track synthesizer generator
-            OutlinedButton(
-                onClick = {
-                    viewModel.makeSampleTracks()
-                },
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .testTag("generate_tracks_button")
-            ) {
-                Text(
-                    "Generate Virtual Ambient Tracks",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Ideal for virtual emulators lacking audio files",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-            )
-        }
-    } else {
-        Scaffold(
+        } else {
+            Scaffold(
+                containerColor = Color.Transparent,
             topBar = {
                 LargeTopAppBar(
                     title = {
@@ -340,23 +366,24 @@ fun MainScreen(
                         }
                     },
                     colors = TopAppBarDefaults.largeTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent
                     )
                 )
             },
             bottomBar = {
-                Column {
-                    // System navigation offset safe padding holds tabs
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                ) {
                     NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = Color.Transparent,
                         tonalElevation = 0.dp,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-                            )
+                            .fillMaxWidth()
+                            .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
                     ) {
                         NavigationBarItem(
                             selected = activeTab == 0,
@@ -368,14 +395,14 @@ fun MainScreen(
                         NavigationBarItem(
                             selected = activeTab == 1,
                             onClick = { activeTab = 1; selectedPlaylist = null },
-                            icon = { Icon(Icons.Default.List, contentDescription = "Playlists") },
+                            icon = { Icon(Icons.Default.List, contentDescription = "Playlists", tint = if (activeTab == 1) MaterialTheme.colorScheme.primary else Color.Gray) },
                             label = { Text("Playlists") },
                             modifier = Modifier.testTag("nav_tab_playlists")
                         )
                         NavigationBarItem(
                             selected = activeTab == 2,
                             onClick = { activeTab = 2 },
-                            icon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                            icon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = if (activeTab == 2) MaterialTheme.colorScheme.primary else Color.Gray) },
                             label = { Text("Search") },
                             modifier = Modifier.testTag("nav_tab_search")
                         )
@@ -430,7 +457,8 @@ fun MainScreen(
                                 onPlayAllClick = { viewModel.playAllInQueue(it) },
                                 activeSong = activeSong,
                                 makeSampleTracks = { viewModel.makeSampleTracks() },
-                                isScanning = isScanning
+                                isScanning = isScanning,
+                                isDarkTheme = isDarkTheme
                             )
 
                             1 -> PlaylistTabContent(
@@ -442,7 +470,8 @@ fun MainScreen(
                                 onSongClick = { list, song -> viewModel.playSongFromList(list, song) },
                                 onSongDelete = { pId, songPath -> viewModel.removeSongFromPlaylist(pId, songPath) },
                                 onPlaylistDelete = { viewModel.deletePlaylist(it); selectedPlaylist = null },
-                                activeSong = activeSong
+                                activeSong = activeSong,
+                                isDarkTheme = isDarkTheme
                             )
 
                             2 -> LibraryTabContent(
@@ -454,7 +483,8 @@ fun MainScreen(
                                 onSongClick = { song -> viewModel.playSongFromList(songs, song) },
                                 onAddToPlaylist = { playlistId, song -> viewModel.addSongToPlaylist(playlistId, song) },
                                 onDeleteSong = { song -> viewModel.deleteSong(song) },
-                                activeSong = activeSong
+                                activeSong = activeSong,
+                                isDarkTheme = isDarkTheme
                             )
                         }
                     }
@@ -482,7 +512,8 @@ fun MainScreen(
                                 onPlayPauseClick = { viewModel.togglePlayPause() },
                                 onNextClick = { viewModel.next() },
                                 onPreviousClick = { viewModel.previous() },
-                                onClick = { isPlayerExpanded = true }
+                                onClick = { isPlayerExpanded = true },
+                                isDarkTheme = isDarkTheme
                             )
                         }
                     }
@@ -530,18 +561,19 @@ fun MainScreen(
                 onAddToPlaylist = { playlistId, song ->
                     viewModel.addSongToPlaylist(playlistId, song)
                     Toast.makeText(context, "Added to playlist", Toast.LENGTH_SHORT).show()
-                }
+                },
+                isDarkTheme = isDarkTheme
             )
         }
 
         // Custom Playlist Creation dialog
         if (showCreatePlaylistDialog) {
             Dialog(onDismissRequest = { showCreatePlaylistDialog = false }) {
-                Card(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    shape = RoundedCornerShape(16.dp)
+                        .padding(16.dp)
+                        .liquidGlassCard(cornerRadius = 16.dp, isDarkTheme = isDarkTheme)
                 ) {
                     Column(
                         modifier = Modifier
@@ -592,6 +624,7 @@ fun MainScreen(
             }
         }
     }
+    }
 }
 
 fun calculateProgressRatio(position: Long, duration: Long): Float {
@@ -612,7 +645,8 @@ fun FolderTabContent(
     onPlayAllClick: (List<Song>) -> Unit,
     activeSong: Song?,
     makeSampleTracks: () -> Unit,
-    isScanning: Boolean
+    isScanning: Boolean,
+    isDarkTheme: Boolean = true
 ) {
     if (folders.isEmpty() && !isScanning) {
         Column(
@@ -673,15 +707,12 @@ fun FolderTabContent(
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(folders) { f ->
-                    Card(
-                        onClick = { onFolderClick(f) },
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        ),
-                        shape = RoundedCornerShape(16.dp),
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(150.dp)
+                            .liquidGlassCard(cornerRadius = 20.dp, isDarkTheme = isDarkTheme)
+                            .liquidGlassClickable { onFolderClick(f) }
                             .testTag("folder_card_${f.name}")
                     ) {
                         Column(
@@ -781,6 +812,7 @@ fun FolderTabContent(
                             song = song,
                             isActive = activeSong?.absolutePath == song.absolutePath,
                             onClick = { onSongClick(folder.songs, song) },
+                            isDarkTheme = isDarkTheme,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -803,7 +835,8 @@ fun PlaylistTabContent(
     onSongClick: (List<Song>, Song) -> Unit,
     onSongDelete: (Int, String) -> Unit,
     onPlaylistDelete: (Int) -> Unit,
-    activeSong: Song?
+    activeSong: Song?,
+    isDarkTheme: Boolean = true
 ) {
     AnimatedContent(
         targetState = selectedPlaylist,
@@ -864,12 +897,11 @@ fun PlaylistTabContent(
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(playlists) { p ->
-                            Card(
-                                onClick = { onPlaylistClick(p) },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .liquidGlassCard(cornerRadius = 16.dp, isDarkTheme = isDarkTheme)
+                                    .liquidGlassClickable { onPlaylistClick(p) }
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -1001,7 +1033,8 @@ fun PlaylistTabContent(
                                     TrackRow(
                                         song = s,
                                         isActive = activeSong?.absolutePath == s.absolutePath,
-                                        onClick = { onSongClick(songsList, s) }
+                                        onClick = { onSongClick(songsList, s) },
+                                        isDarkTheme = isDarkTheme
                                     )
                                 }
                                 IconButton(
@@ -1041,7 +1074,8 @@ fun LibraryTabContent(
     onSongClick: (Song) -> Unit,
     onAddToPlaylist: (Int, Song) -> Unit,
     onDeleteSong: (Song) -> Unit,
-    activeSong: Song?
+    activeSong: Song?,
+    isDarkTheme: Boolean = true
 ) {
     var songToAddToPlaylist by remember { mutableStateOf<Song?>(null) }
     var selectedSongForMetadata by remember { mutableStateOf<Song?>(null) }
@@ -1135,6 +1169,7 @@ fun LibraryTabContent(
                                     RecentlyPlayedCard(
                                         song = song,
                                         isActive = activeSong?.absolutePath == song.absolutePath,
+                                        isDarkTheme = isDarkTheme,
                                         onClick = { onSongClick(song) }
                                     )
                                 }
@@ -1152,6 +1187,7 @@ fun LibraryTabContent(
                         onAddToPlaylistClick = { songToAddToPlaylist = song },
                         onRemoveClick = { songToDeleteConfirmation = song },
                         onViewMetadataClick = { selectedSongForMetadata = song },
+                        isDarkTheme = isDarkTheme,
                         modifier = Modifier.animateItem()
                     )
                 }
@@ -1163,14 +1199,11 @@ fun LibraryTabContent(
     if (songToAddToPlaylist != null) {
         val song = songToAddToPlaylist!!
         Dialog(onDismissRequest = { songToAddToPlaylist = null }) {
-            Card(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                    .padding(16.dp)
+                    .liquidGlassCard(cornerRadius = 16.dp, isDarkTheme = isDarkTheme)
             ) {
                 Column(
                     modifier = Modifier
@@ -1245,14 +1278,11 @@ fun LibraryTabContent(
     if (selectedSongForMetadata != null) {
         val song = selectedSongForMetadata!!
         Dialog(onDismissRequest = { selectedSongForMetadata = null }) {
-            Card(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                    .padding(16.dp)
+                    .liquidGlassCard(cornerRadius = 16.dp, isDarkTheme = isDarkTheme)
             ) {
                 Column(
                     modifier = Modifier
@@ -1290,36 +1320,51 @@ fun LibraryTabContent(
     // Confirm Deletion dialog
     if (songToDeleteConfirmation != null) {
         val song = songToDeleteConfirmation!!
-        AlertDialog(
-            onDismissRequest = { songToDeleteConfirmation = null },
-            title = {
-                Text(
-                    text = "Delete Track permanently?",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = "Are you sure you want to permanently delete \"${song.title}\" from your library and storage?"
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDeleteSong(song)
-                        songToDeleteConfirmation = null
-                    }
+        Dialog(onDismissRequest = { songToDeleteConfirmation = null }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth()
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { songToDeleteConfirmation = null }) {
-                    Text("Cancel")
+                    Text(
+                        text = "Delete Track permanently?",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Are you sure you want to permanently delete \"${song.title}\" from your library and storage?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { songToDeleteConfirmation = null }) {
+                            Text("Cancel")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(
+                            onClick = {
+                                onDeleteSong(song)
+                                songToDeleteConfirmation = null
+                            }
+                        ) {
+                            Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
-        )
+        }
     }
 }
 
@@ -1350,16 +1395,12 @@ fun TrackRow(
     onAddToPlaylistClick: (() -> Unit)? = null,
     onRemoveClick: (() -> Unit)? = null,
     onViewMetadataClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDarkTheme: Boolean = true
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val hasActions = onAddToPlaylistClick != null || onRemoveClick != null || onViewMetadataClick != null
 
-    val animatedBgColor by animateColorAsState(
-        targetValue = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent,
-        animationSpec = tween(durationMillis = 300),
-        label = "track_bg_color"
-    )
     val animatedTextColor by animateColorAsState(
         targetValue = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
         animationSpec = tween(durationMillis = 300),
@@ -1379,8 +1420,13 @@ fun TrackRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(animatedBgColor)
+            .then(
+                if (isActive) {
+                    Modifier.liquidGlassCard(cornerRadius = 12.dp, isDarkTheme = isDarkTheme)
+                } else {
+                    Modifier
+                }
+            )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
@@ -1403,7 +1449,7 @@ fun TrackRow(
                     }
                 }
             }
-            .padding(8.dp)
+            .padding(10.dp)
             .testTag("track_row_${song.id}"),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1555,25 +1601,23 @@ fun MiniPlayer(
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
     onPreviousClick: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isDarkTheme: Boolean = true
 ) {
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
+            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+            .height(76.dp)
+            .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
+            .liquidGlassClickable { onClick() }
             .testTag("mini_player")
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             LinearProgressIndicator(
                 progress = progress,
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                color = Color(0xFF06B6D4), // Cyan liquid progress glow
+                trackColor = Color.White.copy(alpha = 0.1f),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp)
@@ -1897,7 +1941,8 @@ fun ExpandedPlayer(
     onSeek: (Long) -> Unit,
     onShuffleToggle: () -> Unit,
     onLoopModeToggle: () -> Unit,
-    onAddToPlaylist: (Int, Song) -> Unit
+    onAddToPlaylist: (Int, Song) -> Unit,
+    isDarkTheme: Boolean = true
 ) {
     var showPlaylistSelectDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
@@ -1907,17 +1952,10 @@ fun ExpandedPlayer(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.surface,
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            )
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
+        AnimatedLiquidBackground(isDarkTheme = isDarkTheme)
         val isLandscape = maxWidth > maxHeight
 
         if (isLandscape) {
@@ -2410,11 +2448,11 @@ fun ExpandedPlayer(
     // Modal select playlist target dialog
     if (showPlaylistSelectDialog) {
         Dialog(onDismissRequest = { showPlaylistSelectDialog = false }) {
-            Card(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(16.dp)
+                    .padding(16.dp)
+                    .liquidGlassCard(cornerRadius = 16.dp, isDarkTheme = isDarkTheme)
             ) {
                 Column(
                     modifier = Modifier
@@ -2443,15 +2481,14 @@ fun ExpandedPlayer(
                                 .heightIn(max = 240.dp)
                         ) {
                             items(playlists) { p ->
-                                Card(
-                                    onClick = {
-                                        onAddToPlaylist(p.playlist.id, song)
-                                        showPlaylistSelectDialog = false
-                                    },
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .liquidGlassCard(cornerRadius = 10.dp, isDarkTheme = isDarkTheme)
+                                        .liquidGlassClickable {
+                                            onAddToPlaylist(p.playlist.id, song)
+                                            showPlaylistSelectDialog = false
+                                        }
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -2483,15 +2520,12 @@ fun ExpandedPlayer(
     // Sleep Timer Setup Dialog
     if (showSleepTimerDialog) {
         Dialog(onDismissRequest = { showSleepTimerDialog = false }) {
-            Card(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
-                    .testTag("sleep_timer_dialog"),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
+                    .testTag("sleep_timer_dialog")
             ) {
                 Column(
                     modifier = Modifier
@@ -2693,15 +2727,12 @@ fun EqualizerDialog(
     val presets = listOf("Flat", "Bass Boost", "Vocal")
 
     Dialog(onDismissRequest = onDismissRequest) {
-        Card(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .testTag("equalizer_dialog"),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+                .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
+                .testTag("equalizer_dialog")
         ) {
             Column(
                 modifier = Modifier
@@ -2970,15 +3001,12 @@ fun PlaybackSpeedDialog(
     onDismissRequest: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
-        Card(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .testTag("speed_dialog"),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+                .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
+                .testTag("speed_dialog")
         ) {
             Column(
                 modifier = Modifier
@@ -3393,18 +3421,15 @@ fun CustomHistoryIcon(color: Color, modifier: Modifier = Modifier) {
 fun RecentlyPlayedCard(
     song: Song,
     isActive: Boolean,
+    isDarkTheme: Boolean = true,
     onClick: () -> Unit
 ) {
-    Card(
+    Box(
         modifier = Modifier
             .width(130.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick() }
-            .testTag("recently_played_card_${song.id}"),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        ),
-        shape = RoundedCornerShape(16.dp)
+            .liquidGlassCard(cornerRadius = 16.dp, isDarkTheme = isDarkTheme)
+            .liquidGlassClickable { onClick() }
+            .testTag("recently_played_card_${song.id}")
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
