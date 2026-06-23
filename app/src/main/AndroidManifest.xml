@@ -34,11 +34,13 @@
         <provider
             android:name="com.example.data.AlbumArtProvider"
             android:authorities="com.example.provider.albumart"
+            android:attributionTags="media"
             android:exported="false" />
 
         <service
             android:name="com.example.playback.MediaPlaybackService"
             android:foregroundServiceType="mediaPlayback"
+            android:attributionTags="media"
             android:exported="false" />
     </application>
 
