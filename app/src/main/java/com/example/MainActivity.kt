@@ -175,10 +175,12 @@ fun MainScreen(
         }
     }
 
-    // Trigger scan on start if permissions already exist
+    // Trigger scan on start if permissions already exist, otherwise request directly
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
             viewModel.scanDevice()
+        } else {
+            launcher.launch(permissionsToRequest)
         }
     }
 
@@ -204,7 +206,7 @@ fun MainScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         AnimatedLiquidBackground(isDarkTheme = isDarkTheme)
 
-        if (!hasPermission && songs.isEmpty()) {
+        if (false) {
             // Permissions / Onboarding Splash screen in a luxurious floating glass container
             Box(
                 modifier = Modifier
@@ -291,33 +293,6 @@ fun MainScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Sandbox/Emulator fallback track synthesizer generator in liquid glass
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .liquidGlassCard(cornerRadius = 16.dp, isDarkTheme = isDarkTheme)
-                            .liquidGlassClickable { viewModel.makeSampleTracks() }
-                            .background(Color.White.copy(alpha = 0.05f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "Generate Virtual Songs",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Ideal for virtual emulators lacking audio files",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                    )
                 }
             }
         } else {
@@ -328,7 +303,7 @@ fun MainScreen(
                     title = {
                         Column {
                             Text(
-                                "Local Player",
+                                "Trebell Player",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 24.sp
                             )
@@ -456,7 +431,6 @@ fun MainScreen(
                                 onSongClick = { list, song -> viewModel.playSongFromList(list, song) },
                                 onPlayAllClick = { viewModel.playAllInQueue(it) },
                                 activeSong = activeSong,
-                                makeSampleTracks = { viewModel.makeSampleTracks() },
                                 isScanning = isScanning,
                                 isDarkTheme = isDarkTheme
                             )
@@ -644,7 +618,6 @@ fun FolderTabContent(
     onSongClick: (List<Song>, Song) -> Unit,
     onPlayAllClick: (List<Song>) -> Unit,
     activeSong: Song?,
-    makeSampleTracks: () -> Unit,
     isScanning: Boolean,
     isDarkTheme: Boolean = true
 ) {
@@ -669,19 +642,11 @@ fun FolderTabContent(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "No tracks are stored on this device. Generate synthetic local audio tracks to play and test with ease!",
+                "Please add audio files (.mp3, .wav, .m4a, etc.) to your storage folders, or grant permission to let Trebell Player locate local files.",
                 textAlign = TextAlign.Center,
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
             )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = makeSampleTracks,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.testTag("generate_samples_folders_empty")
-            ) {
-                Text("Generate Ambient Tracks")
-            }
         }
         return
     }
