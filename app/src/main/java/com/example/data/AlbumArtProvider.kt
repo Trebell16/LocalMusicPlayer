@@ -39,22 +39,56 @@ class AlbumArtProvider : ContentProvider() {
         val file = File(path)
         if (!file.exists()) return null
 
+        val cacheDir = context?.cacheDir ?: return null
+        val thumbDir = File(cacheDir, "thumbnails").apply { mkdirs() }
+        val id = file.hashCode().toLong()
+        val cacheFile = File(thumbDir, "thumb_$id.jpg")
+
+        if (cacheFile.exists()) {
+            return ParcelFileDescriptor.open(cacheFile, ParcelFileDescriptor.MODE_READ_ONLY)
+        }
+
         try {
+            val isVideo = Song.isVideoFile(file.absolutePath)
             val retriever = MediaMetadataRetriever()
             retriever.setDataSource(file.absolutePath)
-            val artBytes = retriever.embeddedPicture
-            try {
-                retriever.release()
-            } catch (ex: Exception) {}
 
-            if (artBytes != null) {
-                // Write to a temporary file in context's cache directory or use pipe
-                val cacheDir = context?.cacheDir ?: return null
-                val cacheFile = File(cacheDir, "art_${file.name.hashCode()}.jpg")
-                if (!cacheFile.exists()) {
-                    FileOutputStream(cacheFile).use { it.write(artBytes) }
+            if (isVideo) {
+                val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                val durationUs = (durationStr?.toLongOrNull() ?: 0L) * 1000L
+                val timeUs = if (durationUs > 0) durationUs / 2 else 1000000L
+                val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                try {
+                    retriever.release()
+                } catch (ex: Exception) {}
+
+                if (bitmap != null) {
+                    val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, 180, 180, true)
+                    bitmap.recycle()
+                    FileOutputStream(cacheFile).use { fos ->
+                        scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, fos)
+                    }
+                    scaled.recycle()
+                    return ParcelFileDescriptor.open(cacheFile, ParcelFileDescriptor.MODE_READ_ONLY)
                 }
-                return ParcelFileDescriptor.open(cacheFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            } else {
+                val artBytes = retriever.embeddedPicture
+                try {
+                    retriever.release()
+                } catch (ex: Exception) {}
+
+                if (artBytes != null) {
+                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size)
+                    if (bitmap != null) {
+                        val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, 180, 180, true)
+                        bitmap.recycle()
+                        FileOutputStream(cacheFile).use { fos ->
+                            scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, fos)
+                        }
+                        scaled.recycle()
+                        return ParcelFileDescriptor.open(cacheFile, ParcelFileDescriptor.MODE_READ_ONLY)
+                    }
+                }
             }
         } catch (e: Exception) {
             Log.e("AlbumArtProvider", "Error extracting artwork for ${file.name}", e)

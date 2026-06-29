@@ -126,6 +126,16 @@ class MusicViewModel(
         }
     }
 
+    fun generateFolderThumbnails(folderPath: String) {
+        viewModelScope.launch {
+            try {
+                repository.generateFolderThumbnails(folderPath)
+            } catch (e: Exception) {
+                // ignore gracefully
+            }
+        }
+    }
+
     fun loadSongsFromCacheOrScan() {
         viewModelScope.launch {
             val cached = repository.loadCachedSongs()

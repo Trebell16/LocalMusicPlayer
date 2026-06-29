@@ -619,7 +619,10 @@ fun MainScreen(
                                 FolderTabContent(
                                     folders = folders,
                                     selectedFolder = selectedFolder,
-                                    onFolderClick = { selectedFolder = it },
+                                    onFolderClick = { 
+                                        selectedFolder = it
+                                        viewModel.generateFolderThumbnails(it.path)
+                                    },
                                     onBackClick = { selectedFolder = null },
                                     onSongClick = { list, song -> 
                                         viewModel.playSongFromList(list, song)
@@ -1804,6 +1807,33 @@ fun MiniPlayer(
     }
 }
 
+@Composable
+fun VideoPlayerView(modifier: Modifier = Modifier) {
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { ctx ->
+            android.view.SurfaceView(ctx).apply {
+                holder.addCallback(object : android.view.SurfaceHolder.Callback {
+                    override fun surfaceCreated(holder: android.view.SurfaceHolder) {
+                        com.example.playback.PlaybackManager.instance?.setVideoSurface(holder.surface)
+                    }
+
+                    override fun surfaceChanged(
+                        holder: android.view.SurfaceHolder,
+                        format: Int,
+                        width: Int,
+                        height: Int
+                    ) {}
+
+                    override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
+                        com.example.playback.PlaybackManager.instance?.setVideoSurface(null)
+                    }
+                })
+            }
+        },
+        modifier = modifier
+    )
+}
+
 /**
  * Dynamic Ambient Audio Visualizer Composable
  */
@@ -2188,31 +2218,53 @@ fun ExpandedPlayer(
                                     .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
                                     .background(Color(0x1A000000))
                             ) {
-                                val painter = rememberAsyncImagePainter(model = song.albumArtUri)
-                                val painterState = painter.state
-                                Image(
-                                    painter = painter,
-                                    contentDescription = "Album Artwork",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                                if (painterState is AsyncImagePainter.State.Error || painterState is AsyncImagePainter.State.Loading) {
-                                    Box(
+                                if (song.isVideo) {
+                                    VideoPlayerView(modifier = Modifier.fillMaxSize())
+                                } else {
+                                    val painter = rememberAsyncImagePainter(model = song.albumArtUri)
+                                    val painterState = painter.state
+                                    Image(
+                                        painter = painter,
+                                        contentDescription = "Album Artwork",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    AudioVisualizer(
+                                        audioSessionId = audioSessionId,
+                                        isPlaying = isPlaying,
                                         modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.linearGradient(
-                                                    listOf(Color(0xFF8B5CF6), Color(0xFF06B6D4))
-                                                )
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.MusicNote,
-                                            contentDescription = "No Artwork",
-                                            tint = Color.White.copy(alpha = 0.8f),
-                                            modifier = Modifier.size(54.dp)
-                                        )
+                                            .align(Alignment.BottomCenter)
+                                            .fillMaxWidth()
+                                            .height(60.dp)
+                                            .padding(bottom = 8.dp, start = 8.dp, end = 8.dp)
+                                    )
+                                    if (painterState is AsyncImagePainter.State.Error || painterState is AsyncImagePainter.State.Loading) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(
+                                                    Brush.linearGradient(
+                                                        listOf(Color(0xFF8B5CF6), Color(0xFF06B6D4))
+                                                    )
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.MusicNote,
+                                                contentDescription = "No Artwork",
+                                                tint = Color.White.copy(alpha = 0.8f),
+                                                modifier = Modifier.size(54.dp)
+                                            )
+                                            AudioVisualizer(
+                                                audioSessionId = audioSessionId,
+                                                isPlaying = isPlaying,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomCenter)
+                                                    .fillMaxWidth()
+                                                    .height(60.dp)
+                                                    .padding(bottom = 8.dp, start = 8.dp, end = 8.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -2552,31 +2604,53 @@ fun ExpandedPlayer(
                                     .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
                                     .background(Color(0x1F000000))
                             ) {
-                                val painter = rememberAsyncImagePainter(model = song.albumArtUri)
-                                val painterState = painter.state
-                                Image(
-                                    painter = painter,
-                                    contentDescription = "Album Artwork",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                                if (painterState is AsyncImagePainter.State.Error || painterState is AsyncImagePainter.State.Loading) {
-                                    Box(
+                                if (song.isVideo) {
+                                    VideoPlayerView(modifier = Modifier.fillMaxSize())
+                                } else {
+                                    val painter = rememberAsyncImagePainter(model = song.albumArtUri)
+                                    val painterState = painter.state
+                                    Image(
+                                        painter = painter,
+                                        contentDescription = "Album Artwork",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    AudioVisualizer(
+                                        audioSessionId = audioSessionId,
+                                        isPlaying = isPlaying,
                                         modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.linearGradient(
-                                                    listOf(Color(0xFF8B5CF6), Color(0xFF06B6D4))
-                                                )
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.MusicNote,
-                                            contentDescription = "No Artwork",
-                                            tint = Color.White.copy(alpha = 0.8f),
-                                            modifier = Modifier.size(72.dp)
-                                        )
+                                            .align(Alignment.BottomCenter)
+                                            .fillMaxWidth()
+                                            .height(80.dp)
+                                            .padding(bottom = 12.dp, start = 12.dp, end = 12.dp)
+                                    )
+                                    if (painterState is AsyncImagePainter.State.Error || painterState is AsyncImagePainter.State.Loading) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(
+                                                    Brush.linearGradient(
+                                                        listOf(Color(0xFF8B5CF6), Color(0xFF06B6D4))
+                                                    )
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.MusicNote,
+                                                contentDescription = "No Artwork",
+                                                tint = Color.White.copy(alpha = 0.8f),
+                                                modifier = Modifier.size(72.dp)
+                                            )
+                                            AudioVisualizer(
+                                                audioSessionId = audioSessionId,
+                                                isPlaying = isPlaying,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomCenter)
+                                                    .fillMaxWidth()
+                                                    .height(80.dp)
+                                                    .padding(bottom = 12.dp, start = 12.dp, end = 12.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }

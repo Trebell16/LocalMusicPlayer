@@ -29,9 +29,17 @@ class PlaybackManager(private val context: Context) {
     init {
         instance = this
         scope.launch {
-            kotlinx.coroutines.flow.combine(currentSong, isPlaying) { _, _ -> }.collect {
+            kotlinx.coroutines.flow.combine(currentSong, isPlaying, isShuffle, loopMode) { _, _, _, _ -> }.collect {
                 updateServiceNotification()
             }
+        }
+    }
+
+    fun setVideoSurface(surface: android.view.Surface?) {
+        try {
+            currentPlayer?.setSurface(surface)
+        } catch (e: Exception) {
+            Log.e("PlaybackManager", "Error setting video surface", e)
         }
     }
 

@@ -13,4 +13,14 @@ data class Song(
     val folderName: String,
     val folderPath: String,
     val albumArtUri: Uri? = null
-)
+) {
+    val isVideo: Boolean
+        get() = isVideoFile(absolutePath)
+
+    companion object {
+        fun isVideoFile(path: String): Boolean {
+            val ext = path.substringAfterLast('.', "").lowercase()
+            return ext in listOf("mp4", "mkv", "webm", "3gp", "avi", "mov", "flv", "wmv")
+        }
+    }
+}

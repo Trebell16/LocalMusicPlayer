@@ -25,6 +25,8 @@ class MediaPlaybackService : Service() {
         const val ACTION_NEXT = "com.example.playback.ACTION_NEXT"
         const val ACTION_PREV = "com.example.playback.ACTION_PREV"
         const val ACTION_STOP = "com.example.playback.ACTION_STOP"
+        const val ACTION_SHUFFLE = "com.example.playback.ACTION_SHUFFLE"
+        const val ACTION_LOOP = "com.example.playback.ACTION_LOOP"
         const val ACTION_UPDATE_NOTIFICATION = "com.example.playback.ACTION_UPDATE_NOTIFICATION"
     }
 
@@ -48,6 +50,15 @@ class MediaPlaybackService : Service() {
                 ACTION_PLAY_PAUSE -> manager.togglePlayPause()
                 ACTION_NEXT -> manager.next()
                 ACTION_PREV -> manager.previous()
+                ACTION_SHUFFLE -> manager.setShuffle(!manager.isShuffle.value)
+                ACTION_LOOP -> {
+                    val nextMode = when (manager.loopMode.value) {
+                        LoopMode.NO_LOOP -> LoopMode.LOOP_ALL
+                        LoopMode.LOOP_ALL -> LoopMode.LOOP_ONE
+                        LoopMode.LOOP_ONE -> LoopMode.NO_LOOP
+                    }
+                    manager.setLoopMode(nextMode)
+                }
                 ACTION_STOP -> {
                     manager.pause()
                     stopForegroundService()
@@ -58,25 +69,73 @@ class MediaPlaybackService : Service() {
 
         val song = manager.currentSong.value
         val playing = manager.isPlaying.value
+        val shuffle = manager.isShuffle.value
+        val loop = manager.loopMode.value
 
         if (song == null) {
             stopForegroundService()
         } else {
-            showNotification(song, playing)
+            showNotification(song, playing, shuffle, loop)
         }
 
         return START_STICKY
     }
 
-    private fun showNotification(song: Song, isPlaying: Boolean) {
-        // PendingIntent to launch MainActivity when notification content is clicked
+    private fun loadThumbnailBitmap(song: Song): android.graphics.Bitmap? {
+        try {
+            val file = java.io.File(song.absolutePath)
+            val id = file.hashCode().toLong()
+            val cacheFile = java.io.File(cacheDir, "thumbnails/thumb_$id.jpg")
+            if (cacheFile.exists()) {
+                return android.graphics.BitmapFactory.decodeFile(cacheFile.absolutePath)
+            }
+
+            val retriever = android.media.MediaMetadataRetriever()
+            retriever.setDataSource(song.absolutePath)
+            if (song.isVideo) {
+                val durationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                val durationUs = (durationStr?.toLongOrNull() ?: 0L) * 1000L
+                val timeUs = if (durationUs > 0) durationUs / 2 else 1000000L
+                val bitmap = retriever.getFrameAtTime(timeUs, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                try { retriever.release() } catch (e: Exception) {}
+                if (bitmap != null) {
+                    val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, 180, 180, true)
+                    bitmap.recycle()
+                    val thumbDir = java.io.File(cacheDir, "thumbnails").apply { mkdirs() }
+                    java.io.FileOutputStream(cacheFile).use { fos ->
+                        scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, fos)
+                    }
+                    return scaled
+                }
+            } else {
+                val artBytes = retriever.embeddedPicture
+                try { retriever.release() } catch (e: Exception) {}
+                if (artBytes != null) {
+                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size)
+                    if (bitmap != null) {
+                        val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, 180, 180, true)
+                        bitmap.recycle()
+                        val thumbDir = java.io.File(cacheDir, "thumbnails").apply { mkdirs() }
+                        java.io.FileOutputStream(cacheFile).use { fos ->
+                            scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, fos)
+                        }
+                        return scaled
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MediaPlaybackService", "Error loading thumbnail bitmap", e)
+        }
+        return null
+    }
+
+    private fun showNotification(song: Song, isPlaying: Boolean, isShuffle: Boolean, loopMode: LoopMode) {
         val contentIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // PendingIntents for media item controls
         val playPauseIntent = Intent(this, MediaPlaybackService::class.java).apply { action = ACTION_PLAY_PAUSE }
         val playPausePendingIntent = PendingIntent.getService(
             this, 1, playPauseIntent,
@@ -101,28 +160,58 @@ class MediaPlaybackService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val shuffleIntent = Intent(this, MediaPlaybackService::class.java).apply { action = ACTION_SHUFFLE }
+        val shufflePendingIntent = PendingIntent.getService(
+            this, 5, shuffleIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val loopIntent = Intent(this, MediaPlaybackService::class.java).apply { action = ACTION_LOOP }
+        val loopPendingIntent = PendingIntent.getService(
+            this, 6, loopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val playPauseIcon = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
         val playPauseText = if (isPlaying) "Pause" else "Play"
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val loopIconRes = when (loopMode) {
+            LoopMode.LOOP_ONE -> com.example.R.drawable.ic_loop_one
+            else -> com.example.R.drawable.ic_loop
+        }
+        val loopText = when (loopMode) {
+            LoopMode.NO_LOOP -> "No Loop"
+            LoopMode.LOOP_ALL -> "Loop All"
+            LoopMode.LOOP_ONE -> "Loop One"
+        }
+
+        val largeIcon = loadThumbnailBitmap(song)
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(song.title)
             .setContentText(song.artist)
             .setSubText(song.album)
             .setContentIntent(contentIntent)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // Required for lockscreeen controls visibility
-            .setOngoing(isPlaying) // Only ongoing if playing, allowing dismissal when paused
-            .setSilent(true) // Prevent annoying alerts on state switches
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(isPlaying)
+            .setSilent(true)
             .setShowWhen(false)
+            .addAction(com.example.R.drawable.ic_shuffle, if (isShuffle) "Shuffle On" else "Shuffle Off", shufflePendingIntent)
             .addAction(android.R.drawable.ic_media_previous, "Previous", prevPendingIntent)
             .addAction(playPauseIcon, playPauseText, playPausePendingIntent)
             .addAction(android.R.drawable.ic_media_next, "Next", nextPendingIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopPendingIntent)
+            .addAction(loopIconRes, loopText, loopPendingIntent)
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
-                    .setShowActionsInCompactView(0, 1, 2)
+                    .setShowActionsInCompactView(1, 2, 3)
             )
-            .build()
+
+        if (largeIcon != null) {
+            builder.setLargeIcon(largeIcon)
+        }
+
+        val notification = builder.build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)

@@ -223,7 +223,8 @@ class MusicRepository(
             val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             val pathsToScan = mutableListOf<String>()
-            val extensions = listOf("mp3", "wav", "m4a", "flac", "ogg", "aac")
+            val videoExtensions = listOf("mp4", "mkv", "webm", "3gp", "avi", "mov", "flv", "wmv")
+            val extensions = listOf("mp3", "wav", "m4a", "flac", "ogg", "aac") + videoExtensions
             
             if (musicDir.exists()) {
                 pathsToScan.add(musicDir.absolutePath)
@@ -303,6 +304,40 @@ class MusicRepository(
             }
         } catch (e: Exception) {
             Log.d("MusicRepository", "MediaStore scan skipped or unsupported: ${e.message}")
+        }
+
+        try {
+            val uri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            val projection = arrayOf(
+                MediaStore.Video.Media._ID,
+                MediaStore.Video.Media.DATA,
+                MediaStore.Video.Media.TITLE,
+                MediaStore.Video.Media.DURATION,
+                MediaStore.Video.Media.SIZE
+            )
+            val selection = "${MediaStore.Video.Media.SIZE} > 0"
+            
+            context.contentResolver.query(uri, projection, selection, null, null)?.use { cursor ->
+                val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)
+                val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.TITLE)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+
+                while (cursor.moveToNext()) {
+                    val path = cursor.getString(dataCol)
+                    if (path.isNullOrBlank()) continue
+                    
+                    val lowerPath = path.lowercase()
+                    val videoExtensions = listOf("mp4", "mkv", "webm", "3gp", "avi", "mov", "flv", "wmv")
+                    if (videoExtensions.any { lowerPath.endsWith(".$it") }) {
+                        val title = cursor.getString(titleCol) ?: "Unknown Video"
+                        val size = cursor.getLong(sizeCol)
+
+                        getOrScanSong(path, title, size)?.let { songsList.add(it) }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("MusicRepository", "MediaStore video scan skipped or unsupported: ${e.message}")
         }
 
         // 2. Direct recursive scanning of primary external and public storage directories
@@ -444,7 +479,8 @@ class MusicRepository(
             } else if (file.isFile) {
                 if (file.name.startsWith(".")) continue
                 val ext = file.extension.lowercase()
-                if (ext == "mp3" || ext == "flac" || ext == "wav" || ext == "ogg" || ext == "m4a") {
+                val videoExtensions = listOf("mp4", "mkv", "webm", "3gp", "avi", "mov", "flv", "wmv")
+                if (ext == "mp3" || ext == "flac" || ext == "wav" || ext == "ogg" || ext == "m4a" || ext in videoExtensions) {
                     foundFiles.add(file)
                 }
             }
@@ -605,6 +641,62 @@ class MusicRepository(
                 buffer[0] = (sample and 0xff).toByte()
                 buffer[1] = ((sample shr 8) and 0xff).toByte()
                 out.write(buffer)
+            }
+        }
+    }
+
+    suspend fun generateFolderThumbnails(folderPath: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val files = File(folderPath).listFiles() ?: return@withContext
+        val cacheDir = context.cacheDir
+        val thumbDir = File(cacheDir, "thumbnails").apply { mkdirs() }
+        
+        for (file in files) {
+            if (file.isFile && !file.name.startsWith(".")) {
+                val isVideo = Song.isVideoFile(file.absolutePath)
+                val id = file.hashCode().toLong()
+                val cacheFile = File(thumbDir, "thumb_$id.jpg")
+                
+                if (!cacheFile.exists()) {
+                    try {
+                        val retriever = android.media.MediaMetadataRetriever()
+                        retriever.setDataSource(file.absolutePath)
+                        
+                        if (isVideo) {
+                            val durationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                            val durationUs = (durationStr?.toLongOrNull() ?: 0L) * 1000L
+                            val timeUs = if (durationUs > 0) durationUs / 2 else 1000000L
+                            val bitmap = retriever.getFrameAtTime(timeUs, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                            
+                            try { retriever.release() } catch (e: Exception) {}
+                            
+                            if (bitmap != null) {
+                                val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, 180, 180, true)
+                                bitmap.recycle()
+                                java.io.FileOutputStream(cacheFile).use { fos ->
+                                    scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, fos)
+                                }
+                                scaled.recycle()
+                            }
+                        } else {
+                            val artBytes = retriever.embeddedPicture
+                            try { retriever.release() } catch (e: Exception) {}
+                            
+                            if (artBytes != null) {
+                                val bitmap = android.graphics.BitmapFactory.decodeByteArray(artBytes, 0, artBytes.size)
+                                if (bitmap != null) {
+                                    val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, 180, 180, true)
+                                    bitmap.recycle()
+                                    java.io.FileOutputStream(cacheFile).use { fos ->
+                                        scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, fos)
+                                    }
+                                    scaled.recycle()
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.d("MusicRepository", "Failed thumbnail generation for ${file.name}: ${e.message}")
+                    }
+                }
             }
         }
     }
