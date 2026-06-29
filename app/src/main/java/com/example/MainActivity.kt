@@ -419,39 +419,52 @@ fun MainScreen(
                                 .fillMaxWidth()
                                 .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
                         ) {
+                            val navItemColors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = if (isDarkTheme) Color(0xFFE2D6F5) else Color(0xFF6750A4),
+                                selectedTextColor = if (isDarkTheme) Color(0xFFE2D6F5) else Color(0xFF6750A4),
+                                indicatorColor = if (isDarkTheme) Color(0x22FFFFFF) else Color(0x146750A4),
+                                unselectedIconColor = if (isDarkTheme) Color(0x80FFFFFF) else Color(0x80000000),
+                                unselectedTextColor = if (isDarkTheme) Color(0x80FFFFFF) else Color(0x80000000)
+                            )
+
                             NavigationBarItem(
                                 selected = activeTab == 0,
                                 onClick = { activeTab = 0 },
-                                icon = { Icon(Icons.Default.MusicNote, contentDescription = "Playing", tint = if (activeTab == 0) MaterialTheme.colorScheme.primary else Color.Gray) },
+                                icon = { Icon(Icons.Default.MusicNote, contentDescription = "Playing") },
                                 label = { Text("Player") },
+                                colors = navItemColors,
                                 modifier = Modifier.testTag("nav_tab_playing")
                             )
                             NavigationBarItem(
                                 selected = activeTab == 1,
                                 onClick = { activeTab = 1 },
-                                icon = { Icon(Icons.Default.List, contentDescription = "Songs", tint = if (activeTab == 1) MaterialTheme.colorScheme.primary else Color.Gray) },
+                                icon = { Icon(Icons.Default.List, contentDescription = "Songs") },
                                 label = { Text("Songs") },
+                                colors = navItemColors,
                                 modifier = Modifier.testTag("nav_tab_songs")
                             )
                             NavigationBarItem(
                                 selected = activeTab == 2,
                                 onClick = { activeTab = 2; selectedAlbum = null },
-                                icon = { Icon(Icons.Default.Album, contentDescription = "Albums", tint = if (activeTab == 2) MaterialTheme.colorScheme.primary else Color.Gray) },
+                                icon = { Icon(Icons.Default.Album, contentDescription = "Albums") },
                                 label = { Text("Albums") },
+                                colors = navItemColors,
                                 modifier = Modifier.testTag("nav_tab_albums")
                             )
                             NavigationBarItem(
                                 selected = activeTab == 3,
                                 onClick = { activeTab = 3; selectedArtist = null },
-                                icon = { Icon(Icons.Default.Person, contentDescription = "Artists", tint = if (activeTab == 3) MaterialTheme.colorScheme.primary else Color.Gray) },
+                                icon = { Icon(Icons.Default.Person, contentDescription = "Artists") },
                                 label = { Text("Artists") },
+                                colors = navItemColors,
                                 modifier = Modifier.testTag("nav_tab_artists")
                             )
                             NavigationBarItem(
                                 selected = activeTab == 4,
                                 onClick = { activeTab = 4; selectedFolder = null },
-                                icon = { Icon(Icons.Default.Folder, contentDescription = "Folders", tint = if (activeTab == 4) MaterialTheme.colorScheme.primary else Color.Gray) },
+                                icon = { Icon(Icons.Default.Folder, contentDescription = "Folders") },
                                 label = { Text("Folders") },
+                                colors = navItemColors,
                                 modifier = Modifier.testTag("nav_tab_folders")
                             )
                         }
@@ -2088,6 +2101,16 @@ fun ExpandedPlayer(
         }
     }
 
+    val playerContentColor = if (isDarkTheme) Color.White else Color(0xFF1E1B24)
+    val playerContentColorSecondary = if (isDarkTheme) Color.White.copy(alpha = 0.7f) else Color(0xFF1E1B24).copy(alpha = 0.7f)
+    val playerContentColorTertiary = if (isDarkTheme) Color.White.copy(alpha = 0.5f) else Color(0xFF1E1B24).copy(alpha = 0.5f)
+    val playerContentColorQuaternary = if (isDarkTheme) Color.White.copy(alpha = 0.2f) else Color(0xFF1E1B24).copy(alpha = 0.2f)
+    val playerGlassBorderColor = if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color(0xFF1E1B24).copy(alpha = 0.12f)
+    val playerIconTint = if (isDarkTheme) Color.White else Color(0xFF1E1B24)
+    val playerBtnBg = if (isDarkTheme) Color(0x1F000000) else Color(0x14000000)
+    val playerPlayPauseBg = if (isDarkTheme) Color.White else Color(0xFF1E1B24)
+    val playerPlayPauseTint = if (isDarkTheme) Color.Black else Color.White
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -2120,10 +2143,17 @@ fun ExpandedPlayer(
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0x7D12121A),
-                                Color(0xCC08080C)
-                            )
+                            colors = if (isDarkTheme) {
+                                listOf(
+                                    Color(0x7D12121A),
+                                    Color(0xCC08080C)
+                                )
+                            } else {
+                                listOf(
+                                    Color(0x22FFFFFF),
+                                    Color(0xB3F0EBF7)
+                                )
+                            }
                         )
                     )
             )
@@ -2158,8 +2188,8 @@ fun ExpandedPlayer(
                                 modifier = Modifier
                                     .fillMaxWidth(0.9f)
                                     .aspectRatio(1f)
-                                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
-                                    .background(Color(0x3D000000))
+                                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
+                                    .background(if (isDarkTheme) Color(0x3D000000) else Color(0x0F000000))
                                     .padding(16.dp)
                             ) {
                                 Column {
@@ -2168,9 +2198,9 @@ fun ExpandedPlayer(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("Lyrics", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                                        Text("Lyrics", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = playerContentColor)
                                         IconButton(onClick = { isLyricsVisible = false }) {
-                                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                                            Icon(Icons.Default.Close, contentDescription = "Close", tint = playerIconTint)
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -2195,7 +2225,7 @@ fun ExpandedPlayer(
                                                 text = line,
                                                 fontSize = if (isActive) 16.sp else 13.sp,
                                                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
+                                                color = if (isActive) playerContentColor else playerContentColorTertiary,
                                                 textAlign = TextAlign.Center,
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -2215,8 +2245,8 @@ fun ExpandedPlayer(
                                 modifier = Modifier
                                     .fillMaxWidth(0.8f)
                                     .aspectRatio(1f)
-                                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
-                                    .background(Color(0x1A000000))
+                                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
+                                    .background(if (isDarkTheme) Color(0x1A000000) else Color(0x05000000))
                             ) {
                                 if (song.isVideo) {
                                     VideoPlayerView(modifier = Modifier.fillMaxSize())
@@ -2290,24 +2320,24 @@ fun ExpandedPlayer(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x1F000000))
-                                .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+                                .background(playerBtnBg)
+                                .border(1.dp, playerGlassBorderColor, CircleShape)
                         ) {
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Collapse", tint = Color.White)
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Collapse", tint = playerIconTint)
                         }
                         Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                             Text(
                                 text = song.title,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                                color = playerContentColor,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = song.artist,
                                 fontSize = 14.sp,
-                                color = Color.White.copy(alpha = 0.7f),
+                                color = playerContentColorSecondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -2331,9 +2361,9 @@ fun ExpandedPlayer(
                                 onSeek((sliderValue * duration).toLong())
                             },
                             colors = SliderDefaults.colors(
-                                activeTrackColor = Color.White,
-                                inactiveTrackColor = Color.White.copy(alpha = 0.2f),
-                                thumbColor = Color.White
+                                activeTrackColor = playerContentColor,
+                                inactiveTrackColor = playerContentColorQuaternary,
+                                thumbColor = playerContentColor
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -2341,8 +2371,8 @@ fun ExpandedPlayer(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(formatDuration(if (isDragging) (sliderValue * duration).toLong() else position), fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f))
-                            Text(formatDuration(duration), fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f))
+                            Text(formatDuration(if (isDragging) (sliderValue * duration).toLong() else position), fontSize = 11.sp, color = playerContentColorSecondary)
+                            Text(formatDuration(duration), fontSize = 11.sp, color = playerContentColorSecondary)
                         }
                     }
 
@@ -2351,8 +2381,8 @@ fun ExpandedPlayer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(72.dp)
-                            .liquidGlassCard(cornerRadius = 36.dp, isDarkTheme = true)
-                            .background(Color(0x14000000))
+                            .liquidGlassCard(cornerRadius = 36.dp, isDarkTheme = isDarkTheme)
+                            .background(if (isDarkTheme) Color(0x14000000) else Color(0x05000000))
                             .padding(horizontal = 12.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
@@ -2365,11 +2395,11 @@ fun ExpandedPlayer(
                                 .clip(CircleShape)
                                 .background(if (isShuffle) Color(0x3D8B5CF6) else Color.Transparent)
                         ) {
-                            CustomShuffleIcon(color = if (isShuffle) Color(0xFF8B5CF6) else Color.White.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                            CustomShuffleIcon(color = if (isShuffle) Color(0xFF8B5CF6) else playerContentColorSecondary, modifier = Modifier.size(18.dp))
                         }
                         // Prev
                         IconButton(onClick = onPreviousClick) {
-                            CustomSkipPreviousIcon(color = Color.White, modifier = Modifier.size(20.dp))
+                            CustomSkipPreviousIcon(color = playerIconTint, modifier = Modifier.size(20.dp))
                         }
                         // Play/Pause circle
                         IconButton(
@@ -2377,13 +2407,13 @@ fun ExpandedPlayer(
                             modifier = Modifier
                                 .size(54.dp)
                                 .clip(CircleShape)
-                                .background(Color.White)
+                                .background(playerPlayPauseBg)
                         ) {
-                            Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = "PlayPause", tint = Color.Black, modifier = Modifier.size(26.dp))
+                            Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = "PlayPause", tint = playerPlayPauseTint, modifier = Modifier.size(26.dp))
                         }
                         // Next
                         IconButton(onClick = onNextClick) {
-                            CustomSkipNextIcon(color = Color.White, modifier = Modifier.size(20.dp))
+                            CustomSkipNextIcon(color = playerIconTint, modifier = Modifier.size(20.dp))
                         }
                         // Loop
                         val isLooping = loopMode != LoopMode.NO_LOOP
@@ -2395,7 +2425,7 @@ fun ExpandedPlayer(
                                 .clip(CircleShape)
                                 .background(if (isLooping) Color(0x3D06B6D4) else Color.Transparent)
                         ) {
-                            CustomLoopIcon(color = if (isLooping) Color(0xFF06B6D4) else Color.White.copy(alpha = 0.7f), loopOne = isLoopOne, modifier = Modifier.size(18.dp))
+                            CustomLoopIcon(color = if (isLooping) Color(0xFF06B6D4) else playerContentColorSecondary, loopOne = isLoopOne, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -2421,14 +2451,14 @@ fun ExpandedPlayer(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(Color(0x1F000000))
-                            .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+                            .background(playerBtnBg)
+                            .border(1.dp, playerGlassBorderColor, CircleShape)
                             .testTag("expand_player_collapse")
                     ) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
                             contentDescription = "Collapse",
-                            tint = Color.White,
+                            tint = playerIconTint,
                             modifier = Modifier.size(26.dp)
                         )
                     }
@@ -2442,13 +2472,13 @@ fun ExpandedPlayer(
                             text = "Now Playing",
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
-                            color = Color.White
+                            color = playerContentColor
                         )
                         val totalDurationFormatted = remember(queueDurationMs) { formatTotalDuration(queueDurationMs) }
                         Text(
                             text = "${queueSize} tracks • ${totalDurationFormatted}",
                             fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.5f)
+                            color = playerContentColorTertiary
                         )
                     }
                     
@@ -2460,14 +2490,14 @@ fun ExpandedPlayer(
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x1F000000))
-                                .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+                                .background(playerBtnBg)
+                                .border(1.dp, playerGlassBorderColor, CircleShape)
                                 .testTag("expand_player_options")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "More Options",
-                                tint = Color.White,
+                                tint = playerIconTint,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -2475,47 +2505,47 @@ fun ExpandedPlayer(
                         DropdownMenu(
                             expanded = showOptionsMenu,
                             onDismissRequest = { showOptionsMenu = false },
-                            modifier = Modifier.background(Color(0xFF1C1920))
+                            modifier = Modifier.background(if (isDarkTheme) Color(0xFF1C1920) else Color(0xFFF0EBF7))
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Equalizer", color = Color.White) },
+                                text = { Text("Equalizer", color = playerContentColor) },
                                 onClick = {
                                     showOptionsMenu = false
                                     showEqualizerDialog = true
                                 },
-                                leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = Color.White) }
+                                leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = playerIconTint) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Add to Playlist", color = Color.White) },
+                                text = { Text("Add to Playlist", color = playerContentColor) },
                                 onClick = {
                                     showOptionsMenu = false
                                     showPlaylistSelectDialog = true
                                 },
-                                leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, tint = Color.White) }
+                                leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, tint = playerIconTint) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Sleep Timer", color = Color.White) },
+                                text = { Text("Sleep Timer", color = playerContentColor) },
                                 onClick = {
                                     showOptionsMenu = false
                                     showSleepTimerDialog = true
                                 },
-                                leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null, tint = Color.White) }
+                                leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null, tint = playerIconTint) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Playback Speed", color = Color.White) },
+                                text = { Text("Playback Speed", color = playerContentColor) },
                                 onClick = {
                                     showOptionsMenu = false
                                     showSpeedDialog = true
                                 },
-                                leadingIcon = { Icon(Icons.Default.Speed, contentDescription = null, tint = Color.White) }
+                                leadingIcon = { Icon(Icons.Default.Speed, contentDescription = null, tint = playerIconTint) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Toggle Lyrics", color = Color.White) },
+                                text = { Text("Toggle Lyrics", color = playerContentColor) },
                                 onClick = {
                                     showOptionsMenu = false
                                     isLyricsVisible = !isLyricsVisible
                                 },
-                                leadingIcon = { Icon(Icons.Default.Lyrics, contentDescription = null, tint = Color.White) }
+                                leadingIcon = { Icon(Icons.Default.Lyrics, contentDescription = null, tint = playerIconTint) }
                             )
                         }
                     }
@@ -2541,8 +2571,8 @@ fun ExpandedPlayer(
                                     .fillMaxHeight()
                                     .aspectRatio(1f, matchHeightConstraintsFirst = true)
                                     .sizeIn(maxWidth = 300.dp, maxHeight = 300.dp)
-                                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
-                                    .background(Color(0x4D000000))
+                                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
+                                    .background(if (isDarkTheme) Color(0x4D000000) else Color(0x0F000000))
                                     .padding(24.dp)
                             ) {
                                 Column {
@@ -2551,9 +2581,9 @@ fun ExpandedPlayer(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("Lyrics", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White)
+                                        Text("Lyrics", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = playerContentColor)
                                         IconButton(onClick = { isLyricsVisible = false }) {
-                                            Icon(Icons.Default.Close, contentDescription = "Close Lyrics", tint = Color.White)
+                                            Icon(Icons.Default.Close, contentDescription = "Close Lyrics", tint = playerIconTint)
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(12.dp))
@@ -2579,7 +2609,7 @@ fun ExpandedPlayer(
                                                 text = line,
                                                 fontSize = if (isActive) 20.sp else 16.sp,
                                                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isActive) Color.White else Color.White.copy(alpha = 0.45f),
+                                                color = if (isActive) playerContentColor else playerContentColorTertiary,
                                                 textAlign = TextAlign.Center,
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -2601,8 +2631,8 @@ fun ExpandedPlayer(
                                     .fillMaxHeight()
                                     .aspectRatio(1f, matchHeightConstraintsFirst = true)
                                     .sizeIn(maxWidth = 300.dp, maxHeight = 300.dp)
-                                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
-                                    .background(Color(0x1F000000))
+                                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
+                                    .background(if (isDarkTheme) Color(0x1F000000) else Color(0x05000000))
                             ) {
                                 if (song.isVideo) {
                                     VideoPlayerView(modifier = Modifier.fillMaxSize())
@@ -2675,7 +2705,7 @@ fun ExpandedPlayer(
                                 text = song.title,
                                 fontSize = 26.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                                color = playerContentColor,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -2683,7 +2713,7 @@ fun ExpandedPlayer(
                             Text(
                                 text = song.artist,
                                 fontSize = 16.sp,
-                                color = Color.White.copy(alpha = 0.7f),
+                                color = playerContentColorSecondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -2692,7 +2722,7 @@ fun ExpandedPlayer(
                                 Text(
                                     text = song.album,
                                     fontSize = 13.sp,
-                                    color = Color.White.copy(alpha = 0.5f),
+                                    color = playerContentColorTertiary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -2707,14 +2737,14 @@ fun ExpandedPlayer(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
-                                .background(if (isFavorite) Color(0x3DFF3B30) else Color(0x1F000000))
-                                .border(1.dp, if (isFavorite) Color(0xFFFF3B30).copy(alpha = 0.4f) else Color.White.copy(alpha = 0.1f), CircleShape)
+                                .background(if (isFavorite) Color(0x3DFF3B30) else playerBtnBg)
+                                .border(1.dp, if (isFavorite) Color(0xFFFF3B30).copy(alpha = 0.4f) else playerGlassBorderColor, CircleShape)
                                 .graphicsLayer(scaleX = favScale, scaleY = favScale)
                         ) {
                             Icon(
                                 imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 contentDescription = "Favorite",
-                                tint = if (isFavorite) Color(0xFFFF3B30) else Color.White.copy(alpha = 0.8f),
+                                tint = if (isFavorite) Color(0xFFFF3B30) else playerIconTint,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -2726,8 +2756,8 @@ fun ExpandedPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
-                        .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
-                        .background(Color(0x1F000000))
+                        .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
+                        .background(if (isDarkTheme) Color(0x1F000000) else Color(0x05000000))
                         .padding(top = 4.dp, bottom = 12.dp, start = 12.dp, end = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -2746,9 +2776,9 @@ fun ExpandedPlayer(
                             onSeek((sliderValue * duration).toLong())
                         },
                         colors = SliderDefaults.colors(
-                            activeTrackColor = Color.White,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.18f),
-                            thumbColor = Color.White
+                            activeTrackColor = playerContentColor,
+                            inactiveTrackColor = playerContentColorQuaternary,
+                            thumbColor = playerContentColor
                         ),
                         modifier = Modifier.fillMaxWidth().testTag("expanded_seek_slider")
                     )
@@ -2761,7 +2791,7 @@ fun ExpandedPlayer(
                         Text(
                             text = formatDuration(if (isDragging) (sliderValue * duration).toLong() else position),
                             fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.6f)
+                            color = playerContentColorSecondary
                         )
                         
                         // FLAC or quality format details inside progress clock row
@@ -2777,13 +2807,13 @@ fun ExpandedPlayer(
                             text = formatDetails,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White.copy(alpha = 0.45f)
+                            color = playerContentColorSecondary
                         )
                         
                         Text(
                             text = formatDuration(duration),
                             fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.6f)
+                            color = playerContentColorSecondary
                         )
                     }
                 }
@@ -2793,8 +2823,8 @@ fun ExpandedPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(76.dp)
-                        .liquidGlassCard(cornerRadius = 38.dp, isDarkTheme = true)
-                        .background(Color(0x1F000000))
+                        .liquidGlassCard(cornerRadius = 38.dp, isDarkTheme = isDarkTheme)
+                        .background(if (isDarkTheme) Color(0x1F000000) else Color(0x05000000))
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
@@ -2805,13 +2835,13 @@ fun ExpandedPlayer(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(if (isShuffle) Color(0x3D8B5CF6) else Color(0x0F000000))
-                            .border(1.dp, if (isShuffle) Color(0xFF8B5CF6).copy(alpha = 0.3f) else Color.White.copy(alpha = 0.08f), CircleShape)
+                            .background(if (isShuffle) Color(0x3D8B5CF6) else playerBtnBg)
+                            .border(1.dp, if (isShuffle) Color(0xFF8B5CF6).copy(alpha = 0.3f) else playerGlassBorderColor, CircleShape)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Shuffle,
                             contentDescription = "Shuffle",
-                            tint = if (isShuffle) Color(0xFF8B5CF6) else Color.White.copy(alpha = 0.8f),
+                            tint = if (isShuffle) Color(0xFF8B5CF6) else playerIconTint,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -2824,7 +2854,7 @@ fun ExpandedPlayer(
                         Icon(
                             imageVector = Icons.Default.SkipPrevious,
                             contentDescription = "Previous",
-                            tint = Color.White,
+                            tint = playerIconTint,
                             modifier = Modifier.size(26.dp)
                         )
                     }
@@ -2835,13 +2865,13 @@ fun ExpandedPlayer(
                         modifier = Modifier
                             .size(60.dp)
                             .clip(CircleShape)
-                            .background(Color.White)
-                            .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                            .background(playerPlayPauseBg)
+                            .border(2.dp, playerGlassBorderColor, CircleShape)
                     ) {
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = "Play/Pause",
-                            tint = Color.Black,
+                            tint = playerPlayPauseTint,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -2854,7 +2884,7 @@ fun ExpandedPlayer(
                         Icon(
                             imageVector = Icons.Default.SkipNext,
                             contentDescription = "Next",
-                            tint = Color.White,
+                            tint = playerIconTint,
                             modifier = Modifier.size(26.dp)
                         )
                     }
@@ -2867,14 +2897,14 @@ fun ExpandedPlayer(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(if (isLooping) Color(0x3D06B6D4) else Color(0x0F000000))
-                            .border(1.dp, if (isLooping) Color(0xFF06B6D4).copy(alpha = 0.3f) else Color.White.copy(alpha = 0.08f), CircleShape)
+                            .background(if (isLooping) Color(0x3D06B6D4) else playerBtnBg)
+                            .border(1.dp, if (isLooping) Color(0xFF06B6D4).copy(alpha = 0.3f) else playerGlassBorderColor, CircleShape)
                     ) {
                         val repeatIcon = if (isLoopOne) Icons.Default.RepeatOne else Icons.Default.Repeat
                         Icon(
                             imageVector = repeatIcon,
                             contentDescription = "Repeat Mode",
-                            tint = if (isLooping) Color(0xFF06B6D4) else Color.White.copy(alpha = 0.8f),
+                            tint = if (isLooping) Color(0xFF06B6D4) else playerIconTint,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -2885,8 +2915,8 @@ fun ExpandedPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 12.dp)
-                        .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
-                        .background(Color(0x14000000))
+                        .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
+                        .background(if (isDarkTheme) Color(0x14000000) else Color(0x05000000))
                         .padding(vertical = 12.dp, horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
@@ -2898,19 +2928,19 @@ fun ExpandedPlayer(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x1F000000))
-                                .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                                .background(playerBtnBg)
+                                .border(1.dp, playerGlassBorderColor, CircleShape)
                                 .testTag("expand_player_equalizer")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.GraphicEq,
                                 contentDescription = "Equalizer",
-                                tint = Color.White.copy(alpha = 0.9f),
+                                tint = playerIconTint,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("Equalizer", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f))
+                        Text("Equalizer", fontSize = 10.sp, color = playerContentColorSecondary)
                     }
                     
                     // Add to Playlist
@@ -2920,14 +2950,14 @@ fun ExpandedPlayer(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x1F000000))
-                                .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                                .background(playerBtnBg)
+                                .border(1.dp, playerGlassBorderColor, CircleShape)
                                 .testTag("expand_player_add_playlist")
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add Playlist", tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Add, contentDescription = "Add Playlist", tint = playerIconTint, modifier = Modifier.size(20.dp))
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("Playlist", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f))
+                        Text("Playlist", fontSize = 10.sp, color = playerContentColorSecondary)
                     }
                     
                     // Lyrics Button
@@ -2937,13 +2967,13 @@ fun ExpandedPlayer(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
-                                .background(if (isLyricsVisible) Color(0x3D06B6D4) else Color(0x1F000000))
-                                .border(1.dp, if (isLyricsVisible) Color(0xFF06B6D4).copy(alpha = 0.3f) else Color.White.copy(alpha = 0.08f), CircleShape)
+                                .background(if (isLyricsVisible) Color(0x3D06B6D4) else playerBtnBg)
+                                .border(1.dp, if (isLyricsVisible) Color(0xFF06B6D4).copy(alpha = 0.3f) else playerGlassBorderColor, CircleShape)
                         ) {
-                            Icon(Icons.Default.List, contentDescription = "Lyrics", tint = if (isLyricsVisible) Color(0xFF06B6D4) else Color.White.copy(alpha = 0.9f), modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.List, contentDescription = "Lyrics", tint = if (isLyricsVisible) Color(0xFF06B6D4) else playerIconTint, modifier = Modifier.size(20.dp))
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("Lyrics", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f))
+                        Text("Lyrics", fontSize = 10.sp, color = playerContentColorSecondary)
                     }
                     
                     // Sleep Timer
@@ -2954,14 +2984,14 @@ fun ExpandedPlayer(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
-                                .background(if (isTimerActive) Color(0x3DFFB020) else Color(0x1F000000))
-                                .border(1.dp, if (isTimerActive) Color(0xFFFFB020).copy(alpha = 0.3f) else Color.White.copy(alpha = 0.08f), CircleShape)
+                                .background(if (isTimerActive) Color(0x3DFFB020) else playerBtnBg)
+                                .border(1.dp, if (isTimerActive) Color(0xFFFFB020).copy(alpha = 0.3f) else playerGlassBorderColor, CircleShape)
                                 .testTag("expand_player_sleep_timer")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Schedule,
                                 contentDescription = "Sleep Timer",
-                                tint = if (isTimerActive) Color(0xFFFFB020) else Color.White.copy(alpha = 0.9f),
+                                tint = if (isTimerActive) Color(0xFFFFB020) else playerIconTint,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -2970,7 +3000,7 @@ fun ExpandedPlayer(
                             text = if (isTimerActive) formatRemainingTime(sleepTimerRemaining!!) else "Timer",
                             fontSize = 10.sp,
                             fontWeight = if (isTimerActive) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isTimerActive) Color(0xFFFFB020) else Color.White.copy(alpha = 0.6f)
+                            color = if (isTimerActive) Color(0xFFFFB020) else playerContentColorSecondary
                         )
                     }
                     
@@ -2981,19 +3011,19 @@ fun ExpandedPlayer(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x1F000000))
-                                .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                                .background(playerBtnBg)
+                                .border(1.dp, playerGlassBorderColor, CircleShape)
                                 .testTag("expand_player_speed")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Speed,
                                 contentDescription = "Playback Speed",
-                                tint = Color.White.copy(alpha = 0.9f),
+                                tint = playerIconTint,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("${playbackSpeed}x", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f))
+                        Text("${playbackSpeed}x", fontSize = 10.sp, color = playerContentColorSecondary)
                     }
                 }
             }
@@ -3018,14 +3048,14 @@ fun ExpandedPlayer(
                         "Add current song to:",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = playerContentColor
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
                     if (playlists.isEmpty()) {
                         Text(
                             "No playlists available. Please create a playlist first in the Playlists tab.",
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = playerContentColorSecondary,
                             fontSize = 14.sp
                         )
                     } else {
@@ -3040,7 +3070,7 @@ fun ExpandedPlayer(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0x0FFFFFFF))
+                                        .background(if (isDarkTheme) Color(0x0FFFFFFF) else Color(0x0F000000))
                                         .clickable {
                                             onAddToPlaylist(item.playlist.id, song)
                                             showPlaylistSelectDialog = false
@@ -3051,7 +3081,7 @@ fun ExpandedPlayer(
                                         text = item.playlist.name,
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
+                                        color = playerContentColor
                                     )
                                 }
                             }
@@ -3063,7 +3093,7 @@ fun ExpandedPlayer(
                         onClick = { showPlaylistSelectDialog = false },
                         modifier = Modifier.align(Alignment.End)
                     ) {
-                        Text("Close", color = Color.White)
+                        Text("Close", color = playerContentColor)
                     }
                 }
             }
@@ -3079,7 +3109,7 @@ fun ExpandedPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
-                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
+                    .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
                     .testTag("sleep_timer_dialog")
             ) {
                 Column(
@@ -3092,7 +3122,7 @@ fun ExpandedPlayer(
                         text = "Sleep Timer",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = playerContentColor
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -3100,7 +3130,7 @@ fun ExpandedPlayer(
                     Text(
                         text = "Automatically stops playback when the countdown finishes.",
                         fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.6f),
+                        color = playerContentColorSecondary,
                         textAlign = TextAlign.Center
                     )
 
@@ -3139,7 +3169,7 @@ fun ExpandedPlayer(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0x0FFFFFFF))
+                                        .background(if (isDarkTheme) Color(0x0FFFFFFF) else Color(0x0F000000))
                                         .clickable {
                                             onStartSleepTimer(minutes)
                                             showSleepTimerDialog = false
@@ -3150,21 +3180,21 @@ fun ExpandedPlayer(
                                     Text(
                                         text = "${minutes}m",
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = playerContentColor
                                     )
                                 }
                             }
                         }
 
                         Spacer(modifier = Modifier.height(24.dp))
-                        Divider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(horizontal = 16.dp))
+                        Divider(color = playerContentColorQuaternary, modifier = Modifier.padding(horizontal = 16.dp))
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Text(
                             text = "Custom: ${customMinutes.toInt()} minutes",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White.copy(alpha = 0.8f)
+                            color = playerContentColorSecondary
                         )
 
                         Slider(
@@ -3173,8 +3203,9 @@ fun ExpandedPlayer(
                             valueRange = 1f..120f,
                             steps = 119,
                             colors = SliderDefaults.colors(
-                                activeTrackColor = Color.White,
-                                thumbColor = Color.White
+                                activeTrackColor = playerContentColor,
+                                inactiveTrackColor = playerContentColorQuaternary,
+                                thumbColor = playerContentColor
                             ),
                             modifier = Modifier.testTag("sleep_timer_custom_slider")
                         )
@@ -3187,8 +3218,8 @@ fun ExpandedPlayer(
                                 showSleepTimerDialog = false
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.White,
-                                contentColor = Color.Black
+                                containerColor = playerContentColor,
+                                contentColor = if (isDarkTheme) Color.Black else Color.White
                             ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth().testTag("sleep_timer_custom_set_button")
@@ -3203,7 +3234,7 @@ fun ExpandedPlayer(
                         onClick = { showSleepTimerDialog = false },
                         modifier = Modifier.align(Alignment.End).testTag("sleep_timer_dialog_cancel")
                     ) {
-                        Text("Cancel", color = Color.White)
+                        Text("Cancel", color = playerContentColor)
                     }
                 }
             }
@@ -3213,6 +3244,7 @@ fun ExpandedPlayer(
     if (showEqualizerDialog) {
         EqualizerDialog(
             equalizerManager = equalizerManager,
+            isDarkTheme = isDarkTheme,
             onDismissRequest = { showEqualizerDialog = false }
         )
     }
@@ -3221,6 +3253,7 @@ fun ExpandedPlayer(
         PlaybackSpeedDialog(
             playbackSpeed = playbackSpeed,
             onPlaybackSpeedChange = onPlaybackSpeedChange,
+            isDarkTheme = isDarkTheme,
             onDismissRequest = { showSpeedDialog = false }
         )
     }
@@ -3229,6 +3262,7 @@ fun ExpandedPlayer(
 @Composable
 fun EqualizerDialog(
     equalizerManager: AudioEqualizerManager,
+    isDarkTheme: Boolean = true,
     onDismissRequest: () -> Unit
 ) {
     val isEnabled by equalizerManager.isEnabled.collectAsStateWithLifecycle()
@@ -3242,7 +3276,7 @@ fun EqualizerDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
+                .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
                 .testTag("equalizer_dialog")
         ) {
             Column(
@@ -3509,6 +3543,7 @@ fun CustomEqualizerIcon(color: Color, modifier: Modifier = Modifier) {
 fun PlaybackSpeedDialog(
     playbackSpeed: Float,
     onPlaybackSpeedChange: (Float) -> Unit,
+    isDarkTheme: Boolean = true,
     onDismissRequest: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
@@ -3516,7 +3551,7 @@ fun PlaybackSpeedDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = true)
+                .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
                 .testTag("speed_dialog")
         ) {
             Column(
