@@ -100,8 +100,41 @@ interface RecentlyPlayedDao {
     suspend fun clearAll()
 }
 
-@Database(entities = [PlaylistEntity::class, PlaylistSongEntity::class, RecentlyPlayedEntity::class], version = 2, exportSchema = false)
+@Entity(tableName = "cached_songs")
+data class CachedSongEntity(
+    @PrimaryKey val absolutePath: String,
+    val id: Long,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val duration: Long,
+    val size: Long,
+    val folderName: String,
+    val folderPath: String,
+    val albumArtUri: String?
+)
+
+@Dao
+interface CachedSongDao {
+    @Query("SELECT * FROM cached_songs ORDER BY title ASC")
+    suspend fun getAllCachedSongs(): List<CachedSongEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSongs(songs: List<CachedSongEntity>)
+
+    @Query("DELETE FROM cached_songs WHERE absolutePath = :path")
+    suspend fun deleteSongByPath(path: String)
+
+    @Query("DELETE FROM cached_songs WHERE absolutePath IN (:paths)")
+    suspend fun deleteSongsByPaths(paths: List<String>)
+
+    @Query("DELETE FROM cached_songs")
+    suspend fun clearAll()
+}
+
+@Database(entities = [PlaylistEntity::class, PlaylistSongEntity::class, RecentlyPlayedEntity::class, CachedSongEntity::class], version = 3, exportSchema = false)
 abstract class MusicDatabase : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
     abstract fun recentlyPlayedDao(): RecentlyPlayedDao
+    abstract fun cachedSongDao(): CachedSongDao
 }

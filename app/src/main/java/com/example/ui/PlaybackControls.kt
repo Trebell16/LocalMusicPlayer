@@ -12,6 +12,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -142,8 +148,10 @@ fun PlaybackControls(
                         .size(44.dp)
                         .testTag("control_playback_shuffle")
                 ) {
-                    CustomShuffleIcon(
-                        color = if (isShuffle) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.6f),
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (isShuffle) primaryContainerColor else Color.Gray.copy(alpha = 0.6f),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -157,26 +165,12 @@ fun PlaybackControls(
                     .size(if (isCompact) 40.dp else 56.dp)
                     .testTag("control_playback_previous")
             ) {
-                Canvas(modifier = Modifier.size(if (isCompact) 24.dp else 34.dp)) {
-                    val w = size.width
-                    val h = size.height
-                    
-                    // Draw vertical bar on left
-                    drawRoundRect(
-                        color = controlColor,
-                        topLeft = Offset(w * 0.22f, h * 0.25f),
-                        size = Size(w * 0.12f, h * 0.5f),
-                        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                    )
-                    // Draw backward arrow polygon
-                    val path = Path().apply {
-                        moveTo(w * 0.78f, h * 0.25f)
-                        lineTo(w * 0.40f, h * 0.5f)
-                        lineTo(w * 0.78f, h * 0.75f)
-                        close()
-                    }
-                    drawPath(path, controlColor)
-                }
+                Icon(
+                    imageVector = Icons.Default.SkipPrevious,
+                    contentDescription = "Previous",
+                    tint = controlColor,
+                    modifier = Modifier.size(if (isCompact) 24.dp else 34.dp)
+                )
             }
 
             // Play/Pause Action Floating Container
@@ -207,31 +201,13 @@ fun PlaybackControls(
                 contentAlignment = Alignment.Center
             ) {
                 if (isPlaying) {
-                    // Customized sharp pause bars
-                    Canvas(modifier = Modifier.size(if (isCompact) 22.dp else 30.dp)) {
-                        val w = size.width
-                        val h = size.height
-                        val barWidth = w * 0.18f
-                        val spacing = w * 0.16f
-                        val startX1 = (w - (barWidth * 2 + spacing)) / 2f
-                        val startY = h * 0.24f
-                        val barHeight = h * 0.52f
-
-                        drawRoundRect(
-                            color = onPrimaryColor,
-                            topLeft = Offset(startX1, startY),
-                            size = Size(barWidth, barHeight),
-                            cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                        )
-                        drawRoundRect(
-                            color = onPrimaryColor,
-                            topLeft = Offset(startX1 + barWidth + spacing, startY),
-                            size = Size(barWidth, barHeight),
-                            cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Pause,
+                        contentDescription = "Pause",
+                        tint = onPrimaryColor,
+                        modifier = Modifier.size(if (isCompact) 28.dp else 40.dp)
+                    )
                 } else {
-                    // Customized sharp play triangle
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = "Play",
@@ -249,26 +225,12 @@ fun PlaybackControls(
                     .size(if (isCompact) 40.dp else 56.dp)
                     .testTag("control_playback_next")
             ) {
-                Canvas(modifier = Modifier.size(if (isCompact) 24.dp else 34.dp)) {
-                    val w = size.width
-                    val h = size.height
-                    
-                    // Draw forward arrow polygon
-                    val path = Path().apply {
-                        moveTo(w * 0.22f, h * 0.25f)
-                        lineTo(w * 0.60f, h * 0.5f)
-                        lineTo(w * 0.22f, h * 0.75f)
-                        close()
-                    }
-                    drawPath(path, controlColor)
-                    // Draw vertical bar on right
-                    drawRoundRect(
-                        color = controlColor,
-                        topLeft = Offset(w * 0.66f, h * 0.25f),
-                        size = Size(w * 0.12f, h * 0.5f),
-                        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.SkipNext,
+                    contentDescription = "Next",
+                    tint = controlColor,
+                    modifier = Modifier.size(if (isCompact) 24.dp else 34.dp)
+                )
             }
 
             // Toggleable Repeat Button
@@ -279,13 +241,16 @@ fun PlaybackControls(
                         .size(44.dp)
                         .testTag("control_playback_repeat")
                 ) {
-                    CustomLoopIcon(
-                        color = when (loopMode) {
-                            LoopMode.LOOP_ALL -> MaterialTheme.colorScheme.primary
-                            LoopMode.LOOP_ONE -> MaterialTheme.colorScheme.tertiary
-                            LoopMode.NO_LOOP -> Color.Gray.copy(alpha = 0.6f)
-                        },
-                        loopOne = loopMode == LoopMode.LOOP_ONE,
+                    val repeatIcon = if (loopMode == LoopMode.LOOP_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
+                    val repeatColor = when (loopMode) {
+                        LoopMode.LOOP_ALL -> primaryContainerColor
+                        LoopMode.LOOP_ONE -> MaterialTheme.colorScheme.tertiary
+                        LoopMode.NO_LOOP -> Color.Gray.copy(alpha = 0.6f)
+                    }
+                    Icon(
+                        imageVector = repeatIcon,
+                        contentDescription = "Repeat Mode",
+                        tint = repeatColor,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -303,76 +268,4 @@ private fun formatDuration(ms: Long): String {
     return "$minStr:$secStr"
 }
 
-@Composable
-fun CustomShuffleIcon(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        
-        // Parallel diagonal threads with crossing lines
-        drawLine(color = color, start = Offset(w * 0.2f, h * 0.3f), end = Offset(w * 0.5f, h * 0.3f), strokeWidth = 2.dp.toPx())
-        drawLine(color = color, start = Offset(w * 0.5f, h * 0.3f), end = Offset(w * 0.8f, h * 0.7f), strokeWidth = 2.dp.toPx())
-        val arrow1 = Path().apply {
-            moveTo(w * 0.8f, h * 0.7f)
-            lineTo(w * 0.74f, h * 0.6f)
-            lineTo(w * 0.82f, h * 0.6f)
-            close()
-        }
-        drawPath(arrow1, color)
 
-        drawLine(color = color, start = Offset(w * 0.2f, h * 0.7f), end = Offset(w * 0.5f, h * 0.7f), strokeWidth = 2.dp.toPx())
-        drawLine(color = color, start = Offset(w * 0.5f, h * 0.7f), end = Offset(w * 0.8f, h * 0.3f), strokeWidth = 2.dp.toPx())
-        val arrow2 = Path().apply {
-            moveTo(w * 0.8f, h * 0.3f)
-            lineTo(w * 0.74f, h * 0.4f)
-            lineTo(w * 0.82f, h * 0.4f)
-            close()
-        }
-        drawPath(arrow2, color)
-    }
-}
-
-@Composable
-fun CustomLoopIcon(color: Color, loopOne: Boolean, modifier: Modifier = Modifier) {
-    val bgColor = MaterialTheme.colorScheme.background
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val center = Offset(w / 2, h / 2)
-            val radius = w * 0.28f
-            drawCircle(
-                color = color,
-                radius = radius,
-                style = Stroke(width = 2.dp.toPx())
-            )
-            
-            // Draw gap in circle to look like loop arrows
-            drawArc(
-                color = bgColor,
-                startAngle = -45f,
-                sweepAngle = 30f,
-                useCenter = false,
-                style = Stroke(width = 4.dp.toPx())
-            )
-
-            // Draw a neat arrow tip representing looping motion
-            val arrowPath = Path().apply {
-                moveTo(center.x + radius + 4.dp.toPx(), center.y - 4.dp.toPx())
-                lineTo(center.x + radius, center.y + 2.dp.toPx())
-                lineTo(center.x + radius - 4.dp.toPx(), center.y - 4.dp.toPx())
-                close()
-            }
-            drawPath(arrowPath, color)
-        }
-        if (loopOne) {
-            Text(
-                "1",
-                fontSize = 10.sp,
-                color = color,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.offset(y = (-1).dp)
-            )
-        }
-    }
-}

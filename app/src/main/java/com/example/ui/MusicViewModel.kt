@@ -126,6 +126,28 @@ class MusicViewModel(
         }
     }
 
+    fun loadSongsFromCacheOrScan() {
+        viewModelScope.launch {
+            val cached = repository.loadCachedSongs()
+            if (cached.isNotEmpty()) {
+                _songs.value = cached
+                _folders.value = repository.groupSongsByFolder(cached)
+                // Silent background check for updates/edits
+                launch {
+                    try {
+                        val scanned = repository.scanSongs()
+                        _songs.value = scanned
+                        _folders.value = repository.groupSongsByFolder(scanned)
+                    } catch (e: Exception) {
+                        // ignore gracefully
+                    }
+                }
+            } else {
+                scanDevice()
+            }
+        }
+    }
+
     fun makeSampleTracks() {
         viewModelScope.launch {
             _isScanning.value = true
