@@ -14,7 +14,9 @@ import com.example.data.db.PlaylistSongEntity
 import com.example.data.db.PlaylistWithSongs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -30,6 +32,24 @@ class MusicRepository(
 
     val playlistsFlow: Flow<List<PlaylistEntity>> = playlistDao.getAllPlaylists()
     val playlistsWithSongsFlow: Flow<List<PlaylistWithSongs>> = playlistDao.getAllPlaylistsWithSongs()
+    
+    val cachedSongsFlow: Flow<List<Song>> = cachedSongDao.getAllCachedSongsFlow().map { list ->
+        list.map { cached ->
+            Song(
+                id = cached.id,
+                absolutePath = cached.absolutePath,
+                title = cached.title,
+                artist = cached.artist,
+                album = cached.album,
+                duration = cached.duration,
+                size = cached.size,
+                folderName = cached.folderName,
+                folderPath = cached.folderPath,
+                albumArtUri = cached.albumArtUri?.let { Uri.parse(it) }
+            )
+        }.sortedBy { it.title }
+    }
+
     val recentlyPlayedFlow: Flow<List<Song>> = recentlyPlayedDao.getRecentlyPlayed().map { list ->
         list.map { entity ->
             Song(
@@ -44,6 +64,20 @@ class MusicRepository(
                 folderPath = entity.folderPath,
                 albumArtUri = entity.albumArtUri?.let { Uri.parse(it) }
             )
+        }
+    }
+
+    private val repositoryScope = kotlinx.coroutines.CoroutineScope(Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
+    private val _isScanning = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isScanningFlow: Flow<Boolean> = _isScanning.asStateFlow()
+
+    fun triggerBackgroundScan() {
+        repositoryScope.launch {
+            try {
+                scanSongs()
+            } catch (e: Exception) {
+                Log.e("MusicRepository", "Background scan exception: ${e.message}", e)
+            }
         }
     }
 
@@ -124,318 +158,274 @@ class MusicRepository(
      * Scans both MediaStore and custom directories, then groups them by their parent folder.
      */
     suspend fun scanSongs(): List<Song> = withContext(Dispatchers.IO) {
-        val songsList = mutableListOf<Song>()
-        val newCacheEntries = mutableListOf<com.example.data.db.CachedSongEntity>()
+        _isScanning.value = true
+        try {
+            val songsList = mutableListOf<Song>()
+            val newCacheEntries = mutableListOf<com.example.data.db.CachedSongEntity>()
 
-        // Load all existing cached songs from database
-        val existingCache = cachedSongDao.getAllCachedSongs()
-        val cacheMap = existingCache.associateBy { it.absolutePath }
-        val processedPaths = mutableSetOf<String>()
+            // Load all existing cached songs from database
+            val existingCache = cachedSongDao.getAllCachedSongs()
+            val cacheMap = existingCache.associateBy { it.absolutePath }
+            val processedPaths = mutableSetOf<String>()
 
-        // Helper to get or scan metadata
-        fun getOrScanSong(path: String, titleFallback: String, sizeFallback: Long): Song? {
-            val file = File(path)
-            if (!file.exists()) return null
-            processedPaths.add(path)
+            // Helper to get or scan metadata
+            fun getOrScanSong(path: String, titleFallback: String, sizeFallback: Long): Song? {
+                val file = File(path)
+                if (!file.exists()) return null
+                processedPaths.add(path)
 
-            val cached = cacheMap[path]
-            if (cached != null && cached.size == file.length()) { // check size as an integrity/edit check
+                val cached = cacheMap[path]
+                if (cached != null && cached.size == file.length()) { // check size as an integrity/edit check
+                    return Song(
+                        id = cached.id,
+                        absolutePath = cached.absolutePath,
+                        title = cached.title,
+                        artist = cached.artist,
+                        album = cached.album,
+                        duration = cached.duration,
+                        size = cached.size,
+                        folderName = cached.folderName,
+                        folderPath = cached.folderPath,
+                        albumArtUri = cached.albumArtUri?.let { Uri.parse(it) }
+                    )
+                }
+
+                // Otherwise, we must scan the metadata as this is a new or edited file
+                val parentFile = file.parentFile
+                val folderName = parentFile?.name ?: "Root"
+                val folderPath = parentFile?.absolutePath ?: "/"
+                var title = titleFallback
+                var artist = "Unknown Artist"
+                var album = "Unknown Album"
+                var duration = 0L
+
+                val retriever = android.media.MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(file.absolutePath)
+                    retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)?.let { title = it }
+                    retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)?.let { artist = it }
+                    retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)?.let { album = it }
+                    retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.let { duration = it }
+                } catch (e: Exception) {
+                    Log.w("MusicRepository", "Could not parse metadata for ${file.name}: ${e.message}")
+                } finally {
+                    try {
+                        retriever.release()
+                    } catch (ex: Exception) {}
+                }
+
+                if (duration <= 0L) {
+                    duration = if (file.extension.lowercase() == "wav") {
+                        getWavDuration(file)
+                    } else {
+                        180000L // 3 minutes default fallback
+                    }
+                }
+
+                val id = file.hashCode().toLong()
+                val albumArtUri = Uri.parse("content://com.example.provider.albumart?path=${Uri.encode(file.absolutePath)}")
+
+                val newEntity = com.example.data.db.CachedSongEntity(
+                    absolutePath = file.absolutePath,
+                    id = id,
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    duration = duration,
+                    size = file.length(),
+                    folderName = folderName,
+                    folderPath = folderPath,
+                    albumArtUri = albumArtUri?.toString()
+                )
+                newCacheEntries.add(newEntity)
+
                 return Song(
-                    id = cached.id,
-                    absolutePath = cached.absolutePath,
-                    title = cached.title,
-                    artist = cached.artist,
-                    album = cached.album,
-                    duration = cached.duration,
-                    size = cached.size,
-                    folderName = cached.folderName,
-                    folderPath = cached.folderPath,
-                    albumArtUri = cached.albumArtUri?.let { Uri.parse(it) }
+                    id = id,
+                    absolutePath = file.absolutePath,
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    duration = duration,
+                    size = file.length(),
+                    folderName = folderName,
+                    folderPath = folderPath,
+                    albumArtUri = albumArtUri
                 )
             }
 
-            // Otherwise, we must scan the metadata as this is a new or edited file
-            val parentFile = file.parentFile
-            val folderName = parentFile?.name ?: "Root"
-            val folderPath = parentFile?.absolutePath ?: "/"
-            var title = titleFallback
-            var artist = "Unknown Artist"
-            var album = "Unknown Album"
-            var duration = 0L
-
-            val retriever = android.media.MediaMetadataRetriever()
+            // 1. Scan via MediaStore
             try {
-                retriever.setDataSource(file.absolutePath)
-                retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)?.let { title = it }
-                retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)?.let { artist = it }
-                retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)?.let { album = it }
-                retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.let { duration = it }
-            } catch (e: Exception) {
-                Log.w("MusicRepository", "Could not parse metadata for ${file.name}: ${e.message}")
-            } finally {
-                try {
-                    retriever.release()
-                } catch (ex: Exception) {}
-            }
+                val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                val projection = arrayOf(
+                    MediaStore.Audio.Media._ID,
+                    MediaStore.Audio.Media.DATA,
+                    MediaStore.Audio.Media.TITLE,
+                    MediaStore.Audio.Media.ARTIST,
+                    MediaStore.Audio.Media.ALBUM,
+                    MediaStore.Audio.Media.DURATION,
+                    MediaStore.Audio.Media.SIZE
+                )
+                val selection = "${MediaStore.Audio.Media.SIZE} > 0"
+                
+                context.contentResolver.query(uri, projection, selection, null, null)?.use { cursor ->
+                    val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+                    val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                    val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
 
-            if (duration <= 0L) {
-                duration = if (file.extension.lowercase() == "wav") {
-                    getWavDuration(file)
-                } else {
-                    180000L // 3 minutes default fallback
-                }
-            }
-
-            val id = file.hashCode().toLong()
-            val albumArtUri = Uri.parse("content://com.example.provider.albumart?path=${Uri.encode(file.absolutePath)}")
-
-            val newEntity = com.example.data.db.CachedSongEntity(
-                absolutePath = file.absolutePath,
-                id = id,
-                title = title,
-                artist = artist,
-                album = album,
-                duration = duration,
-                size = file.length(),
-                folderName = folderName,
-                folderPath = folderPath,
-                albumArtUri = albumArtUri?.toString()
-            )
-            newCacheEntries.add(newEntity)
-
-            return Song(
-                id = id,
-                absolutePath = file.absolutePath,
-                title = title,
-                artist = artist,
-                album = album,
-                duration = duration,
-                size = file.length(),
-                folderName = folderName,
-                folderPath = folderPath,
-                albumArtUri = albumArtUri
-            )
-        }
-
-        // 1. Scan via MediaStore
-        // Pre-scan public directories recursively to trigger MediaStore indexing for newly added files
-        try {
-            val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-            val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val pathsToScan = mutableListOf<String>()
-            val videoExtensions = listOf("mp4", "mkv", "webm", "3gp", "avi", "mov", "flv", "wmv")
-            val extensions = listOf("mp3", "wav", "m4a", "flac", "ogg", "aac") + videoExtensions
-            
-            if (musicDir.exists()) {
-                pathsToScan.add(musicDir.absolutePath)
-                try {
-                    musicDir.walkTopDown().maxDepth(4).forEach { file ->
-                        if (file.isFile && file.extension.lowercase() in extensions) {
-                            pathsToScan.add(file.absolutePath)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.d("MusicRepository", "Music walk failed: ${e.message}")
-                }
-            }
-            if (downloadDir.exists()) {
-                pathsToScan.add(downloadDir.absolutePath)
-                try {
-                    downloadDir.walkTopDown().maxDepth(4).forEach { file ->
-                        if (file.isFile && file.extension.lowercase() in extensions) {
-                            pathsToScan.add(file.absolutePath)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.d("MusicRepository", "Download walk failed: ${e.message}")
-                }
-            }
-            
-            if (pathsToScan.isNotEmpty()) {
-                val latch = java.util.concurrent.CountDownLatch(1)
-                MediaScannerConnection.scanFile(
-                    context,
-                    pathsToScan.toTypedArray(),
-                    null
-                ) { _, _ ->
-                    latch.countDown()
-                }
-                // Wait up to 2 seconds for scanner tasks to run
-                latch.await(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
-            }
-        } catch (e: Exception) {
-            Log.d("MusicRepository", "Pre-scan of public directories bypassed: ${e.message}")
-        }
-
-        try {
-            val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-            val projection = arrayOf(
-                MediaStore.Audio.Media._ID,
-                MediaStore.Audio.Media.DATA,
-                MediaStore.Audio.Media.TITLE,
-                MediaStore.Audio.Media.ARTIST,
-                MediaStore.Audio.Media.ALBUM,
-                MediaStore.Audio.Media.DURATION,
-                MediaStore.Audio.Media.SIZE
-            )
-            // Query all audio files (size > 0) to avoid excluding downloaded custom files or tones which might lack the IS_MUSIC flag
-            val selection = "${MediaStore.Audio.Media.SIZE} > 0"
-            
-            context.contentResolver.query(uri, projection, selection, null, null)?.use { cursor ->
-                val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-                val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
-
-                while (cursor.moveToNext()) {
-                    val path = cursor.getString(dataCol)
-                    if (path.isNullOrBlank()) continue
-                    
-                    val lowerPath = path.lowercase()
-                    if (lowerPath.endsWith(".mp3") || lowerPath.endsWith(".wav") || 
-                        lowerPath.endsWith(".m4a") || lowerPath.endsWith(".ogg") || 
-                        lowerPath.endsWith(".flac") || lowerPath.endsWith(".aac")) {
+                    while (cursor.moveToNext()) {
+                        val path = cursor.getString(dataCol)
+                        if (path.isNullOrBlank()) continue
                         
-                        val title = cursor.getString(titleCol) ?: "Unknown Track"
-                        val size = cursor.getLong(sizeCol)
+                        val lowerPath = path.lowercase()
+                        if (lowerPath.endsWith(".mp3") || lowerPath.endsWith(".wav") || 
+                            lowerPath.endsWith(".m4a") || lowerPath.endsWith(".ogg") || 
+                            lowerPath.endsWith(".flac") || lowerPath.endsWith(".aac")) {
+                            
+                            val title = cursor.getString(titleCol) ?: "Unknown Track"
+                            val size = cursor.getLong(sizeCol)
 
-                        getOrScanSong(path, title, size)?.let { songsList.add(it) }
+                            getOrScanSong(path, title, size)?.let { songsList.add(it) }
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                Log.d("MusicRepository", "MediaStore scan skipped or unsupported: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.d("MusicRepository", "MediaStore scan skipped or unsupported: ${e.message}")
-        }
 
-        try {
-            val uri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            val projection = arrayOf(
-                MediaStore.Video.Media._ID,
-                MediaStore.Video.Media.DATA,
-                MediaStore.Video.Media.TITLE,
-                MediaStore.Video.Media.DURATION,
-                MediaStore.Video.Media.SIZE
-            )
-            val selection = "${MediaStore.Video.Media.SIZE} > 0"
-            
-            context.contentResolver.query(uri, projection, selection, null, null)?.use { cursor ->
-                val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)
-                val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.TITLE)
-                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+            try {
+                val uri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                val projection = arrayOf(
+                    MediaStore.Video.Media._ID,
+                    MediaStore.Video.Media.DATA,
+                    MediaStore.Video.Media.TITLE,
+                    MediaStore.Video.Media.DURATION,
+                    MediaStore.Video.Media.SIZE
+                )
+                val selection = "${MediaStore.Video.Media.SIZE} > 0"
+                
+                context.contentResolver.query(uri, projection, selection, null, null)?.use { cursor ->
+                    val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)
+                    val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.TITLE)
+                    val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
 
-                while (cursor.moveToNext()) {
-                    val path = cursor.getString(dataCol)
-                    if (path.isNullOrBlank()) continue
-                    
-                    val lowerPath = path.lowercase()
-                    val videoExtensions = listOf("mp4", "mkv", "webm", "3gp", "avi", "mov", "flv", "wmv")
-                    if (videoExtensions.any { lowerPath.endsWith(".$it") }) {
-                        val title = cursor.getString(titleCol) ?: "Unknown Video"
-                        val size = cursor.getLong(sizeCol)
+                    while (cursor.moveToNext()) {
+                        val path = cursor.getString(dataCol)
+                        if (path.isNullOrBlank()) continue
+                        
+                        val lowerPath = path.lowercase()
+                        val videoExtensions = listOf("mp4", "mkv", "webm", "3gp", "avi", "mov", "flv", "wmv")
+                        if (videoExtensions.any { lowerPath.endsWith(".$it") }) {
+                            val title = cursor.getString(titleCol) ?: "Unknown Video"
+                            val size = cursor.getLong(sizeCol)
 
-                        getOrScanSong(path, title, size)?.let { songsList.add(it) }
+                            getOrScanSong(path, title, size)?.let { songsList.add(it) }
+                        }
                     }
                 }
-            }
-        } catch (e: Exception) {
-            Log.d("MusicRepository", "MediaStore video scan skipped or unsupported: ${e.message}")
-        }
-
-        // 2. Direct recursive scanning of primary external and public storage directories
-        val foundFiles = mutableListOf<File>()
-        val visitedPaths = mutableSetOf<String>()
-        val rootsToScan = mutableListOf<File>()
-
-        try {
-            rootsToScan.add(context.filesDir)
-        } catch (e: Exception) {
-            Log.d("MusicRepository", "Internal files directory bypassed: ${e.message}")
-        }
-
-        try {
-            rootsToScan.add(Environment.getExternalStorageDirectory())
-        } catch (e: Exception) {
-            Log.d("MusicRepository", "External storage root directories bypassed: ${e.message}")
-        }
-
-        try {
-            rootsToScan.add(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC))
-        } catch (e: Exception) {}
-
-        try {
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            rootsToScan.add(downloadsDir)
-        } catch (e: Exception) {}
-
-        try {
-            context.getExternalFilesDirs(null)?.forEach { dir ->
-                if (dir != null) rootsToScan.add(dir)
-            }
-        } catch (e: Exception) {}
-
-        try {
-            context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.let { rootsToScan.add(it) }
-        } catch (e: Exception) {}
-
-        val uniqueRoots = rootsToScan.filter { 
-            try {
-                it.exists() && it.isDirectory && it.canRead()
             } catch (e: Exception) {
-                false
+                Log.d("MusicRepository", "MediaStore video scan skipped or unsupported: ${e.message}")
             }
-        }.distinctBy { try { it.canonicalPath } catch (e: Exception) { it.absolutePath } }
 
-        for (root in uniqueRoots) {
+            // 2. Direct recursive scanning of specific app/music folders only to keep scanning instant
+            val foundFiles = mutableListOf<File>()
+            val visitedPaths = mutableSetOf<String>()
+            val rootsToScan = mutableListOf<File>()
+
             try {
-                scanDirectoryRecursively(root, foundFiles, visitedPaths)
+                rootsToScan.add(context.filesDir)
             } catch (e: Exception) {
-                Log.e("MusicRepository", "Error scanning root dir ${root.absolutePath}: ${e.message}")
+                Log.d("MusicRepository", "Internal files directory bypassed: ${e.message}")
             }
-        }
 
-        // Process found files
-        for (file in foundFiles) {
             try {
-                val path = file.absolutePath
-                val filename = file.name
-                val isDupe = songsList.any { 
-                    try {
-                        File(it.absolutePath).name.equals(filename, ignoreCase = true)
-                    } catch (e: Exception) {
-                        false
+                val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+                if (musicDir.exists()) rootsToScan.add(musicDir)
+            } catch (e: Exception) {}
+
+            try {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (downloadsDir.exists()) rootsToScan.add(downloadsDir)
+            } catch (e: Exception) {}
+
+            try {
+                context.getExternalFilesDirs(null)?.forEach { dir ->
+                    if (dir != null) rootsToScan.add(dir)
+                }
+            } catch (e: Exception) {}
+
+            try {
+                context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.let { rootsToScan.add(it) }
+            } catch (e: Exception) {}
+
+            val uniqueRoots = rootsToScan.filter { 
+                try {
+                    it.exists() && it.isDirectory && it.canRead()
+                } catch (e: Exception) {
+                    false
+                }
+            }.distinctBy { try { it.canonicalPath } catch (e: Exception) { it.absolutePath } }
+
+            for (root in uniqueRoots) {
+                try {
+                    val depthLimit = if (root == context.filesDir || root.absolutePath.contains(context.packageName)) 4 else 2
+                    scanDirectoryRecursively(root, foundFiles, visitedPaths, maxDepth = depthLimit)
+                } catch (e: Exception) {
+                    Log.e("MusicRepository", "Error scanning root dir ${root.absolutePath}: ${e.message}")
+                }
+            }
+
+            // Process found files
+            val existingNamesLower = songsList.map { it.absolutePath.substringAfterLast('/').lowercase() }.toMutableSet()
+            val existingPaths = songsList.map { it.absolutePath }.toMutableSet()
+
+            for (file in foundFiles) {
+                try {
+                    val path = file.absolutePath
+                    val filename = file.name
+                    val filenameLower = filename.lowercase()
+
+                    val isDupe = existingNamesLower.contains(filenameLower)
+                    val hasPath = existingPaths.contains(path)
+
+                    if (!isDupe && !hasPath) {
+                        val titleFallback = file.nameWithoutExtension.replace("_", " ")
+                        getOrScanSong(path, titleFallback, file.length())?.let {
+                            songsList.add(it)
+                            existingNamesLower.add(filenameLower)
+                            existingPaths.add(path)
+                        }
+                    } else {
+                        processedPaths.add(path)
                     }
+                } catch (e: Exception) {
+                    Log.e("MusicRepository", "Error processing file ${file.name}: ${e.message}")
                 }
-                if (!isDupe && songsList.none { it.absolutePath == path }) {
-                    val titleFallback = file.nameWithoutExtension.replace("_", " ")
-                    getOrScanSong(path, titleFallback, file.length())?.let { songsList.add(it) }
-                } else {
-                    processedPaths.add(path)
+            }
+
+            // Write new cache entries to DB
+            if (newCacheEntries.isNotEmpty()) {
+                try {
+                    cachedSongDao.insertSongs(newCacheEntries)
+                } catch (e: Exception) {
+                    Log.e("MusicRepository", "DB failed to write cached songs: ${e.message}", e)
                 }
-            } catch (e: Exception) {
-                Log.e("MusicRepository", "Error processing file ${file.name}: ${e.message}")
             }
-        }
 
-        // Write new cache entries to DB
-        if (newCacheEntries.isNotEmpty()) {
-            try {
-                cachedSongDao.insertSongs(newCacheEntries)
-            } catch (e: Exception) {
-                Log.e("MusicRepository", "DB failed to write cached songs: ${e.message}", e)
+            // Detect songs that have been deleted physically and remove them from the cached DB
+            val deletedPaths = cacheMap.keys.filter { it !in processedPaths }
+            if (deletedPaths.isNotEmpty()) {
+                try {
+                    cachedSongDao.deleteSongsByPaths(deletedPaths)
+                } catch (e: Exception) {
+                    Log.e("MusicRepository", "DB failed to delete cached songs: ${e.message}", e)
+                }
             }
-        }
 
-        // Detect songs that have been deleted physically and remove them from the cached DB
-        val deletedPaths = cacheMap.keys.filter { it !in processedPaths }
-        if (deletedPaths.isNotEmpty()) {
-            try {
-                cachedSongDao.deleteSongsByPaths(deletedPaths)
-            } catch (e: Exception) {
-                Log.e("MusicRepository", "DB failed to delete cached songs: ${e.message}", e)
-            }
+            songsList.sortBy { it.title }
+            songsList
+        } finally {
+            _isScanning.value = false
         }
-
-        songsList.sortBy { it.title }
-        songsList
     }
 
     /**
@@ -445,7 +435,7 @@ class MusicRepository(
         dir: File,
         foundFiles: MutableList<File>,
         visitedPaths: MutableSet<String>,
-        maxDepth: Int = 12,
+        maxDepth: Int = 5,
         currentDepth: Int = 0
     ) {
         if (currentDepth > maxDepth) return
@@ -458,8 +448,14 @@ class MusicRepository(
         val name = dir.name
         if (name.startsWith(".")) return
 
-        // Skip standard high-volume Android folders under root
-        if (name.equals("Android", ignoreCase = true) && currentDepth <= 1) return
+        // Skip standard high-volume Android/system/non-media folders to ensure scanning is lightning-fast
+        val lowerName = name.lowercase()
+        val ignoredNames = setOf(
+            "android", "dcim", "pictures", "alarms", "ringtones", "notifications",
+            "podcasts", "screenshots", "whatsapp", "telegram", "facebook", "instagram",
+            "movies", "backups", "miui", "samsung", "cache", "logs", "temp", "tmp"
+        )
+        if (ignoredNames.contains(lowerName)) return
 
         val files = try {
             dir.listFiles()

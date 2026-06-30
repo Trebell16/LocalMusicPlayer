@@ -149,6 +149,7 @@ fun MainScreen(
         val list = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             list.add(android.Manifest.permission.READ_MEDIA_AUDIO)
+            list.add(android.Manifest.permission.READ_MEDIA_VIDEO)
             list.add(android.Manifest.permission.POST_NOTIFICATIONS)
         } else {
             list.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -157,25 +158,25 @@ fun MainScreen(
     }
 
     var hasPermission by remember {
-        val storagePerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            android.Manifest.permission.READ_MEDIA_AUDIO
+        val storagePerms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            listOf(android.Manifest.permission.READ_MEDIA_AUDIO, android.Manifest.permission.READ_MEDIA_VIDEO)
         } else {
-            android.Manifest.permission.READ_EXTERNAL_STORAGE
+            listOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
         }
         mutableStateOf(
-            ContextCompat.checkSelfPermission(context, storagePerm) == PackageManager.PERMISSION_GRANTED
+            storagePerms.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
         )
     }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { map ->
-        val storagePerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            android.Manifest.permission.READ_MEDIA_AUDIO
+        val storagePerms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            listOf(android.Manifest.permission.READ_MEDIA_AUDIO, android.Manifest.permission.READ_MEDIA_VIDEO)
         } else {
-            android.Manifest.permission.READ_EXTERNAL_STORAGE
+            listOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
         }
-        val storageGranted = map[storagePerm] == true
+        val storageGranted = storagePerms.all { map[it] == true }
         hasPermission = storageGranted
         if (storageGranted) {
             viewModel.loadSongsFromCacheOrScan()
@@ -222,7 +223,8 @@ fun MainScreen(
 
     // 0: Now Playing, 1: Songs, 2: Albums, 3: Artists, 4: Folders
     var activeTab by remember { mutableStateOf(1) } // Default to "Songs" tab so they can pick a song
-    var selectedFolder by remember { mutableStateOf<MusicFolder?>(null) }
+    val rootPath = remember { android.os.Environment.getExternalStorageDirectory().absolutePath }
+    var currentFolderPath by remember { mutableStateOf(rootPath) }
     var selectedPlaylist by remember { mutableStateOf<PlaylistWithSongs?>(null) }
     var selectedAlbum by remember { mutableStateOf<AlbumInfo?>(null) }
     var selectedArtist by remember { mutableStateOf<ArtistInfo?>(null) }
@@ -246,8 +248,13 @@ fun MainScreen(
         selectedArtist = null
     }
 
-    BackHandler(enabled = activeTab == 4 && selectedFolder != null) {
-        selectedFolder = null
+    BackHandler(enabled = activeTab == 4 && currentFolderPath != rootPath) {
+        val parent = java.io.File(currentFolderPath).parent
+        if (parent != null && parent.startsWith(rootPath)) {
+            currentFolderPath = parent
+        } else {
+            currentFolderPath = rootPath
+        }
     }
 
     // Playlist Dialog State
@@ -442,6 +449,7 @@ fun MainScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
+                                .padding(horizontal = 8.dp) // Inset items from rounded corner boundaries
                         ) {
                             val navItemColors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = if (isDarkTheme) Color(0xFFE2D6F5) else Color(0xFF6750A4),
@@ -485,7 +493,7 @@ fun MainScreen(
                             )
                             NavigationBarItem(
                                 selected = activeTab == 4,
-                                onClick = { activeTab = 4; selectedFolder = null },
+                                onClick = { activeTab = 4; currentFolderPath = rootPath },
                                 icon = { Icon(Icons.Default.Folder, contentDescription = "Folders") },
                                 label = { Text("Folders") },
                                 colors = navItemColors,
@@ -497,7 +505,7 @@ fun MainScreen(
             }
         ) { innerPadding ->
             val topPadding = if (activeTab == 0) 0.dp else innerPadding.calculateTopPadding()
-            val bottomPadding = if (activeTab == 0) 0.dp else innerPadding.calculateBottomPadding()
+            val bottomPadding = innerPadding.calculateBottomPadding()
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -656,13 +664,12 @@ fun MainScreen(
 
                             4 -> {
                                 FolderTabContent(
-                                    folders = folders,
-                                    selectedFolder = selectedFolder,
-                                    onFolderClick = { 
-                                        selectedFolder = it
-                                        viewModel.generateFolderThumbnails(it.path)
+                                    allSongs = allSongs,
+                                    currentFolderPath = currentFolderPath,
+                                    onFolderPathChange = { 
+                                        currentFolderPath = it
+                                        viewModel.generateFolderThumbnails(it)
                                     },
-                                    onBackClick = { selectedFolder = null },
                                     onSongClick = { list, song -> 
                                         viewModel.playSongFromList(list, song)
                                         activeTab = 0 // Auto focus player!
@@ -746,21 +753,67 @@ fun calculateProgressRatio(position: Long, duration: Long): Float {
 }
 
 /**
- * Tab: FOLDERS VIEW
+ * Tab: FOLDERS VIEW (Nested Hierarchical Explorer)
  */
 @Composable
 fun FolderTabContent(
-    folders: List<MusicFolder>,
-    selectedFolder: MusicFolder?,
-    onFolderClick: (MusicFolder) -> Unit,
-    onBackClick: () -> Unit,
+    allSongs: List<Song>,
+    currentFolderPath: String,
+    onFolderPathChange: (String) -> Unit,
     onSongClick: (List<Song>, Song) -> Unit,
     onPlayAllClick: (List<Song>) -> Unit,
     activeSong: Song?,
     isScanning: Boolean,
     isDarkTheme: Boolean = true
 ) {
-    if (folders.isEmpty() && !isScanning) {
+    val rootPath = remember { android.os.Environment.getExternalStorageDirectory().absolutePath }
+
+    // Derive direct subfolders and direct files inside currentFolderPath
+    val directSubfolders = remember(allSongs, currentFolderPath) {
+        allSongs.mapNotNull { song ->
+            val path = song.absolutePath
+            if (path.startsWith(currentFolderPath + "/")) {
+                val relative = path.substring(currentFolderPath.length + 1)
+                val firstSlash = relative.indexOf('/')
+                if (firstSlash != -1) {
+                    relative.substring(0, firstSlash)
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        }.distinct().sortedWith(String.CASE_INSENSITIVE_ORDER)
+    }
+
+    val directSongs = remember(allSongs, currentFolderPath) {
+        allSongs.filter { song ->
+            val path = song.absolutePath
+            if (path.startsWith(currentFolderPath + "/")) {
+                val relative = path.substring(currentFolderPath.length + 1)
+                !relative.contains('/')
+            } else {
+                false
+            }
+        }.sortedBy { it.title }
+    }
+
+    // All songs inside currentFolderPath recursively (for "Play All" button)
+    val recursiveSongs = remember(allSongs, currentFolderPath) {
+        allSongs.filter { song ->
+            song.absolutePath.startsWith(currentFolderPath + "/")
+        }.sortedBy { it.title }
+    }
+
+    val currentFolderName = remember(currentFolderPath, rootPath) {
+        if (currentFolderPath == rootPath) {
+            "Internal Storage"
+        } else {
+            currentFolderPath.substringAfterLast('/')
+        }
+    }
+
+    if (allSongs.isEmpty() && !isScanning) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -774,14 +827,14 @@ fun FolderTabContent(
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "No Audio Folders Found",
+                "No Media Found",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Please add audio files (.mp3, .wav, .m4a, etc.) to your storage folders, or grant permission to let Trebell Player locate local files.",
+                "Please add music/video files to your storage folders, or grant permission to let Trebell Player locate local files.",
                 textAlign = TextAlign.Center,
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
@@ -790,134 +843,186 @@ fun FolderTabContent(
         return
     }
 
-    AnimatedContent(
-        targetState = selectedFolder,
-        transitionSpec = {
-            if (targetState != null) {
-                slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
-            } else {
-                slideInHorizontally { -it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+    ) {
+        // Navigation bar/header for FolderTab
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (currentFolderPath != rootPath) {
+                IconButton(
+                    onClick = {
+                        val parent = java.io.File(currentFolderPath).parent
+                        if (parent != null && parent.startsWith(rootPath)) {
+                            onFolderPathChange(parent)
+                        } else {
+                            onFolderPathChange(rootPath)
+                        }
+                    },
+                    modifier = Modifier.testTag("back_button")
+                ) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
             }
-        },
-        label = "FolderTransition"
-    ) { folder ->
-        if (folder == null) {
-            // Folders List view
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(folders) { f ->
-                    Box(
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    currentFolderName,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                // Show breadcrumb or subtitle
+                val relativePath = currentFolderPath.removePrefix(rootPath).trim('/')
+                val subtitle = if (relativePath.isEmpty()) {
+                    "${directSubfolders.size} folders • ${directSongs.size} media files"
+                } else {
+                    "Internal Storage > " + relativePath.replace("/", " > ")
+                }
+                Text(
+                    subtitle,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            if (recursiveSongs.isNotEmpty()) {
+                Button(
+                    onClick = { onPlayAllClick(recursiveSongs) },
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("play_all_folder")
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Play All", fontSize = 12.sp)
+                }
+            }
+        }
+
+        Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
+        ) {
+            // 1. List Subfolders
+            if (directSubfolders.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Folders",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                    )
+                }
+
+                items(directSubfolders) { folderName ->
+                    val fullPath = "$currentFolderPath/$folderName"
+                    // Count how many files are inside this subfolder recursively
+                    val childSongsCount = allSongs.count { it.absolutePath.startsWith(fullPath + "/") }
+
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(150.dp)
-                            .liquidGlassCard(cornerRadius = 20.dp, isDarkTheme = isDarkTheme)
-                            .liquidGlassClickable { onFolderClick(f) }
-                            .testTag("folder_card_${f.name}")
+                            .clickable { onFolderPathChange(fullPath) }
+                            .padding(vertical = 12.dp, horizontal = 8.dp)
+                            .testTag("folder_item_$folderName"),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(
+                        Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
+                                .size(40.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                        CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CustomFolderIcon(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = f.name,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 16.sp
-                                )
-                                Text(
-                                    text = "${f.songs.size} tracks",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = folderName,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "$childSongsCount items inside",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
                         }
                     }
                 }
             }
-        } else {
-            // Folder Detail view
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = onBackClick,
-                        modifier = Modifier.testTag("back_button")
-                    ) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            folder.name,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            "${folder.songs.size} tracks in folder",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Button(
-                        onClick = { onPlayAllClick(folder.songs) },
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.testTag("play_all_folder")
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Play All", fontSize = 12.sp)
-                    }
+
+            // 2. List Files (direct songs/videos)
+            if (directSongs.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Files",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                    )
                 }
 
-                Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+                items(directSongs, key = { it.id }) { song ->
+                    TrackRow(
+                        song = song,
+                        isActive = activeSong?.absolutePath == song.absolutePath,
+                        onClick = { onSongClick(directSongs, song) },
+                        isDarkTheme = isDarkTheme,
+                        modifier = Modifier.animateItem()
+                    )
+                }
+            }
 
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
-                ) {
-                    items(folder.songs, key = { it.id }) { song ->
-                        TrackRow(
-                            song = song,
-                            isActive = activeSong?.absolutePath == song.absolutePath,
-                            onClick = { onSongClick(folder.songs, song) },
-                            isDarkTheme = isDarkTheme,
-                            modifier = Modifier.animateItem()
+            // Empty state for this specific folder level
+            if (directSubfolders.isEmpty() && directSongs.isEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 48.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FolderOpen,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "This folder is empty",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -2109,7 +2214,6 @@ fun ExpandedPlayer(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .navigationBarsPadding()
     ) {
         val isLandscape = maxWidth > maxHeight
 
@@ -2474,16 +2578,16 @@ fun ExpandedPlayer(
                 // Album Art Card (Portrait) - Glassmorphic with dynamic sizing
                 Box(
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(1.2f) // Balanced weight
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp),
+                        .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
-                            .sizeIn(maxWidth = 300.dp, maxHeight = 300.dp)
+                            .fillMaxWidth(0.82f)
+                            .aspectRatio(1f)
+                            .sizeIn(maxWidth = 340.dp, maxHeight = 340.dp) // Perfect square sizing boundary
                             .liquidGlassCard(cornerRadius = 24.dp, isDarkTheme = isDarkTheme)
                             .background(if (isDarkTheme) Color(0x1F000000) else Color(0x05000000))
                     ) {
@@ -2522,7 +2626,7 @@ fun ExpandedPlayer(
                                         imageVector = Icons.Default.MusicNote,
                                         contentDescription = "No Artwork",
                                         tint = Color.White.copy(alpha = 0.8f),
-                                        modifier = Modifier.size(72.dp)
+                                        modifier = Modifier.size(96.dp) // Larger fallback music icon
                                     )
                                     AudioVisualizer(
                                         audioSessionId = audioSessionId,

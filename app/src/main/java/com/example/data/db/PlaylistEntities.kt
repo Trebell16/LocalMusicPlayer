@@ -119,6 +119,9 @@ interface CachedSongDao {
     @Query("SELECT * FROM cached_songs ORDER BY title ASC")
     suspend fun getAllCachedSongs(): List<CachedSongEntity>
 
+    @Query("SELECT * FROM cached_songs ORDER BY title ASC")
+    fun getAllCachedSongsFlow(): Flow<List<CachedSongEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSongs(songs: List<CachedSongEntity>)
 

@@ -57,6 +57,17 @@ class MusicViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            repository.cachedSongsFlow.collect { songList ->
+                _songs.value = songList
+                _folders.value = repository.groupSongsByFolder(songList)
+            }
+        }
+        viewModelScope.launch {
+            repository.isScanningFlow.collect { scanning ->
+                _isScanning.value = scanning
+            }
+        }
     }
 
     // Player State Bindings
@@ -112,18 +123,7 @@ class MusicViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun scanDevice() {
-        viewModelScope.launch {
-            _isScanning.value = true
-            try {
-                val scanned = repository.scanSongs()
-                _songs.value = scanned
-                _folders.value = repository.groupSongsByFolder(scanned)
-            } catch (e: Exception) {
-                // handle logs safely
-            } finally {
-                _isScanning.value = false
-            }
-        }
+        repository.triggerBackgroundScan()
     }
 
     fun generateFolderThumbnails(folderPath: String) {
@@ -142,16 +142,8 @@ class MusicViewModel(
             if (cached.isNotEmpty()) {
                 _songs.value = cached
                 _folders.value = repository.groupSongsByFolder(cached)
-                // Silent background check for updates/edits
-                launch {
-                    try {
-                        val scanned = repository.scanSongs()
-                        _songs.value = scanned
-                        _folders.value = repository.groupSongsByFolder(scanned)
-                    } catch (e: Exception) {
-                        // ignore gracefully
-                    }
-                }
+                // silent background update
+                repository.triggerBackgroundScan()
             } else {
                 scanDevice()
             }
@@ -160,16 +152,11 @@ class MusicViewModel(
 
     fun makeSampleTracks() {
         viewModelScope.launch {
-            _isScanning.value = true
             try {
                 repository.generateSampleTracks()
-                val scanned = repository.scanSongs()
-                _songs.value = scanned
-                _folders.value = repository.groupSongsByFolder(scanned)
+                repository.triggerBackgroundScan()
             } catch (e: Exception) {
-                // handle logs safely
-            } finally {
-                _isScanning.value = false
+                // ignore gracefully
             }
         }
     }
